@@ -1,0 +1,1450 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
+import '../services/resistor_scanner_service.dart';
+import '../services/scanner/scanner_coordinator.dart';
+
+/// Screen for scanning resistors via camera or gallery image.
+class ScanResistorScreen extends StatefulWidget {
+  final Uint8List? initialImageBytesForTesting;
+
+  const ScanResistorScreen({
+    super.key,
+    this.initialImageBytesForTesting,
+  });
+
+  @override
+  State<ScanResistorScreen> createState() => _ScanResistorScreenState();
+}
+
+class _ScanResistorScreenState extends State<ScanResistorScreen> {
+  CameraController? _cameraController;
+  bool _isCameraInitialized = false;
+  bool _isProcessing = false;
+
+  // Interactive Image Positioning state
+  bool _isAdjustingImage = false;
+  Uint8List? _selectedImageBytes;
+  final TransformationController _transformationController = TransformationController();
+  double _viewportWidth = 320;
+  double _viewportHeight = 290;
+
+  Uint8List? _capturedImageBytes;
+  bool _hasScanError = false;
+  String? _errorMessage;
+
+  // Detected band count from scanner, and the user's post-scan override (starts same)
+  int _detectedBandCount = 4;
+  int _selectedBandCount = 4;
+  int _band1 = 1; // Default Brown
+  int _band2 = 7; // Default Violet
+  int _band3 = 2; // Default Red
+  int _band4 = 2; // Default Gold
+  int _band5 = 0; // Default Brown (±1%)
+  int _band6 = 0; // Default Brown (100 ppm/K)
+  
+  ResistorScanDebugInfo? _lastScanDebugInfo;
+
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialImageBytesForTesting != null) {
+      _selectedImageBytes = widget.initialImageBytesForTesting;
+      _isAdjustingImage = true;
+    }
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isNotEmpty) {
+        final controller = CameraController(
+          cameras.first,
+          ResolutionPreset.medium,
+          enableAudio: false,
+        );
+        await controller.initialize();
+        if (mounted) {
+          setState(() {
+            _cameraController = controller;
+            _isCameraInitialized = true;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleCameraAction() async {
+    if (_isProcessing) return;
+
+    // If camera is not yet initialized, try to initialize it first (requests permissions)
+    if (!_isCameraInitialized) {
+      setState(() => _isProcessing = true);
+      await _initCamera();
+      setState(() => _isProcessing = false);
+      
+      // If initialization succeeded, the preview will now show. Return so user can aim and click capture.
+      if (_isCameraInitialized && _cameraController != null) {
+        return;
+      } else {
+        // If it failed (e.g., permission denied or no camera), fallback to native picker
+        _fallbackToNativeCamera();
+        return;
+      }
+    }
+
+    // If live camera controller is already initialized and ready, take a picture
+    if (_cameraController != null) {
+      try {
+        setState(() => _isProcessing = true);
+        final file = await _cameraController!.takePicture();
+        final bytes = await file.readAsBytes();
+        _startAdjustment(bytes);
+      } catch (e) {
+        _handleScanFailure("Failed to capture image: $e");
+      }
+    }
+  }
+
+  Future<void> _fallbackToNativeCamera() async {
+    try {
+      final photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        _startAdjustment(bytes);
+      }
+    } catch (e) {
+      _handleScanFailure("Camera not available: $e");
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    if (_isProcessing) return;
+    try {
+      final photo = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        _startAdjustment(bytes);
+      }
+    } catch (e) {
+      _handleScanFailure("Could not load image: $e");
+    }
+  }
+
+  void _startAdjustment(Uint8List bytes) {
+    setState(() {
+      _selectedImageBytes = bytes;
+      _isAdjustingImage = true;
+      _isProcessing = false;
+      _hasScanError = false;
+      _errorMessage = null;
+      _transformationController.value = Matrix4.identity();
+    });
+  }
+
+  void _cancelAdjustment() {
+    setState(() {
+      _isAdjustingImage = false;
+      _selectedImageBytes = null;
+      _transformationController.value = Matrix4.identity();
+    });
+  }
+
+  void _zoomBy(double factor) {
+    final Matrix4 current = _transformationController.value;
+    final double currentScale = current.getMaxScaleOnAxis();
+    final double targetScale = (currentScale * factor).clamp(0.8, 8.0);
+    final double actualFactor = targetScale / currentScale;
+
+    final double cx = _viewportWidth / 2.0;
+    final double cy = _viewportHeight / 2.0;
+
+    final Matrix4 translationToCenter = Matrix4.translationValues(-cx, -cy, 0);
+    final Matrix4 scaleMatrix = Matrix4.diagonal3Values(actualFactor, actualFactor, 1.0);
+    final Matrix4 translationBack = Matrix4.translationValues(cx, cy, 0);
+
+    final Matrix4 newTransform = translationBack * scaleMatrix * translationToCenter * current;
+    setState(() {
+      _transformationController.value = newTransform;
+    });
+  }
+
+  void _zoomIn() => _zoomBy(1.3);
+  void _zoomOut() => _zoomBy(1.0 / 1.3);
+
+  void _resetPosition() {
+    setState(() {
+      _transformationController.value = Matrix4.identity();
+    });
+  }
+
+  void _scanAdjustedImage() {
+    if (_selectedImageBytes == null) return;
+
+    setState(() {
+      _isProcessing = true;
+      _isAdjustingImage = false;
+    });
+
+    final processedBytes = _extractPositionedRegion(
+      sourceBytes: _selectedImageBytes!,
+      transform: _transformationController.value,
+      viewportWidth: _viewportWidth > 0 ? _viewportWidth : 320,
+      viewportHeight: _viewportHeight > 0 ? _viewportHeight : 290,
+    );
+
+    _processImageBytes(processedBytes);
+  }
+
+  /// Extracts the viewport region corresponding to the guide box from the
+  /// user-adjusted image transformation and passes it to resistor detection.
+  Uint8List _extractPositionedRegion({
+    required Uint8List sourceBytes,
+    required Matrix4 transform,
+    required double viewportWidth,
+    required double viewportHeight,
+  }) {
+    try {
+      final srcImg = img.decodeImage(sourceBytes);
+      if (srcImg == null) return sourceBytes;
+
+      final double srcW = srcImg.width.toDouble();
+      final double srcH = srcImg.height.toDouble();
+
+      final double scaleFit = math.min(viewportWidth / srcW, viewportHeight / srcH);
+      final double fittedW = srcW * scaleFit;
+      final double fittedH = srcH * scaleFit;
+      final double offsetX = (viewportWidth - fittedW) / 2.0;
+      final double offsetY = (viewportHeight - fittedH) / 2.0;
+
+      final double tX = transform.storage[12];
+      final double tY = transform.storage[13];
+      final double scale = transform.getMaxScaleOnAxis();
+
+      const int outW = 320;
+      final int outH = (320.0 * (viewportHeight / viewportWidth)).round().clamp(100, 600);
+      final outImg = img.Image(width: outW, height: outH);
+
+      for (int y = 0; y < outH; y++) {
+        final double vpY = (y / outH) * viewportHeight;
+        final double childY = (vpY - tY) / scale;
+        final double imgY = (childY - offsetY) / scaleFit;
+        final int srcYInt = imgY.round();
+
+        for (int x = 0; x < outW; x++) {
+          final double vpX = (x / outW) * viewportWidth;
+          final double childX = (vpX - tX) / scale;
+          final double imgX = (childX - offsetX) / scaleFit;
+          final int srcXInt = imgX.round();
+
+          if (srcXInt >= 0 && srcXInt < srcImg.width && srcYInt >= 0 && srcYInt < srcImg.height) {
+            outImg.setPixel(x, y, srcImg.getPixel(srcXInt, srcYInt));
+          } else {
+            outImg.setPixelRgb(x, y, 220, 200, 170);
+          }
+        }
+      }
+
+      return Uint8List.fromList(img.encodePng(outImg));
+    } catch (_) {
+      return sourceBytes;
+    }
+  }
+
+  
+  Future<void> _processImageBytes(Uint8List bytes) async {
+    ResistorScanResult result = await ScannerCoordinator.detect(bytes);
+
+    setState(() {
+      _capturedImageBytes = bytes;
+      _isProcessing = false;
+      _lastScanDebugInfo = result.debugInfo;
+      if (result.isSuccess) {
+        _hasScanError = false;
+        _errorMessage = null;
+        _detectedBandCount = result.bandCount;
+        _selectedBandCount = (result.bandCount >= 4 && result.bandCount <= 6)
+            ? result.bandCount
+            : 4;
+        _band1 = result.band1Index;
+        _band2 = result.band2Index;
+        _band3 = result.band3Index;
+        _band4 = result.band4Index;
+        _band5 = result.band5Index ?? 0;
+        _band6 = result.band6Index ?? 0;
+        _clampBandIndices();
+      } else {
+        _hasScanError = true;
+        _errorMessage = result.errorMessage ?? "Resistor not detected clearly.";
+      }
+    });
+  }
+
+  void _handleScanFailure(String message) {
+    setState(() {
+      _isProcessing = false;
+      _isAdjustingImage = false;
+      _hasScanError = true;
+      _errorMessage = message;
+    });
+  }
+
+  void _resetScan() {
+    setState(() {
+      _selectedImageBytes = null;
+      _capturedImageBytes = null;
+      _isAdjustingImage = false;
+      _hasScanError = false;
+      _errorMessage = null;
+      _isProcessing = false;
+      _transformationController.value = Matrix4.identity();
+    });
+  }
+
+  void _clampBandIndices() {
+    _selectedBandCount = _selectedBandCount.clamp(4, 6);
+    if (_selectedBandCount == 4) {
+      _band1 = _band1.clamp(0, 9);
+      _band2 = _band2.clamp(0, 9);
+      _band3 = _band3.clamp(0, ResistorScannerService.multiplierColors.length - 1);
+      _band4 = _band4.clamp(0, ResistorScannerService.toleranceColors.length - 1);
+    } else {
+      _band1 = _band1.clamp(0, 9);
+      _band2 = _band2.clamp(0, 9);
+      _band3 = _band3.clamp(0, 9);
+      _band4 = _band4.clamp(0, ResistorScannerService.multiplierColors.length - 1);
+      _band5 = _band5.clamp(0, ResistorScannerService.toleranceColors.length - 1);
+      if (_selectedBandCount == 6) {
+        _band6 = _band6.clamp(0, ResistorScannerService.tempCoColors.length - 1);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final calculation = ResistorScannerService.calculate(
+      bandCount: _selectedBandCount,
+      band1Index: _band1,
+      band2Index: _band2,
+      band3Index: _band3,
+      band4Index: _band4,
+      band5Index: _band5,
+      band6Index: _band6,
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Scan Resistor'),
+        leading: _isAdjustingImage
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back',
+                onPressed: _cancelAdjustment,
+              )
+            : null,
+        actions: [
+          if (!_isAdjustingImage)
+            IconButton(
+              icon: const Icon(Icons.photo_library_rounded),
+              tooltip: 'Pick from Gallery',
+              onPressed: _pickFromGallery,
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Camera / Image Viewfinder Container
+                  _buildViewfinderContainer(),
+                  const SizedBox(height: 14),
+
+                  // Guide / Instruction text
+                  Center(
+                    child: Text(
+                      _isAdjustingImage
+                          ? 'Move and zoom the image until the resistor is inside the guide.'
+                          : 'Place the resistor inside the guide and make sure the color bands are clearly visible.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Action State (Scanning, Adjusting, Error, or Results)
+                  if (_isProcessing)
+                    _buildProcessingIndicator()
+                  else if (_isAdjustingImage)
+                    _buildAdjustmentControls()
+                  else if (_hasScanError)
+                    _buildErrorView()
+                  else if (_capturedImageBytes != null)
+                    _buildResultsSection(calculation)
+                  else
+                    _buildCaptureControls(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Viewfinder frame showing live preview, interactive image adjustment, captured image, or placeholder.
+  Widget _buildViewfinderContainer() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 290,
+        width: double.infinity,
+        color: const Color(0xFF0F172A),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            _viewportWidth = constraints.maxWidth;
+            _viewportHeight = constraints.maxHeight;
+
+            final double guideWidth = _viewportWidth * 0.60;
+            final double guideHeight = _viewportHeight * 0.30;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // Layer 1: Background Content (Interactive Image, Captured Image, CameraPreview, or Placeholder)
+                if (_isAdjustingImage && _selectedImageBytes != null)
+                  InteractiveViewer(
+                    transformationController: _transformationController,
+                    minScale: 0.8,
+                    maxScale: 8.0,
+                    boundaryMargin: const EdgeInsets.all(240),
+                    panEnabled: true,
+                    scaleEnabled: true,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: _viewportWidth,
+                      height: _viewportHeight,
+                      child: Image.memory(
+                        _selectedImageBytes!,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  )
+                else if (_capturedImageBytes != null)
+                  Image.memory(
+                    _capturedImageBytes!,
+                    fit: BoxFit.cover,
+                  )
+                else if (_isCameraInitialized && _cameraController != null)
+                  CameraPreview(_cameraController!)
+                else
+                  Container(
+                    color: const Color(0xFF1E293B),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.camera_alt_outlined,
+                          size: 48,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Camera Viewfinder',
+                          style: TextStyle(
+                            color: Color(0xFFE2E8F0),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Layer 2: Fixed Visual Resistor Alignment Guide Box (Overlay)
+                IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      key: const Key('resistor_alignment_guide'),
+                      width: guideWidth,
+                      height: guideHeight,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amberAccent,
+                          width: 2.2,
+                        ),
+                        color: Colors.black.withValues(alpha: 0.18),
+                      ),
+                      child: Center(
+                        child: Container(
+                          height: 1.5,
+                          color: Colors.amberAccent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Layer 3: Top Status Badge
+                Positioned(
+                  top: 12,
+                  left: 14,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _isAdjustingImage
+                                ? Colors.amberAccent
+                                : (_capturedImageBytes != null ? Colors.greenAccent : Colors.redAccent),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _isAdjustingImage
+                              ? 'Adjust Position'
+                              : (_capturedImageBytes != null ? 'Captured Image' : 'Live Guide'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Interactive adjustment toolbar and action buttons for gallery/camera images.
+  Widget _buildAdjustmentControls() {
+    return Column(
+      children: [
+        // Pan & Zoom tool buttons
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: _zoomOut,
+                icon: const Icon(Icons.zoom_out_rounded),
+                tooltip: 'Zoom Out',
+                color: const Color(0xFF334155),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _zoomIn,
+                icon: const Icon(Icons.zoom_in_rounded),
+                tooltip: 'Zoom In',
+                color: const Color(0xFF334155),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 1,
+                height: 24,
+                color: const Color(0xFFCBD5E1),
+              ),
+              const SizedBox(width: 12),
+              Tooltip(
+                message: 'Reset Position',
+                child: TextButton.icon(
+                  onPressed: _resetPosition,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Reset'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Action Buttons: Back and Scan
+        Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: OutlinedButton.icon(
+                onPressed: _cancelAdjustment,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Back'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton.icon(
+                onPressed: _scanAdjustedImage,
+                icon: const Icon(Icons.search_rounded),
+                label: const Text('Scan Resistor'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+
+  /// Initial camera capture buttons before a photo is taken.
+  Widget _buildCaptureControls() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _handleCameraAction,
+                icon: const Icon(Icons.camera_alt_rounded),
+                label: Text(_isCameraInitialized ? 'Capture Photo' : 'Start Camera'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: _pickFromGallery,
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Gallery'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Loading state indicator during image decoding and detection.
+  Widget _buildProcessingIndicator() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 24.0),
+      child: Column(
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 14),
+          Text(
+            'Analyzing resistor color bands...',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF475569),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Friendly error view when detection is unclear.
+  Widget _buildErrorView() {
+    return Card(
+      elevation: 1,
+      color: const Color(0xFFFFFBEB),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFFDE68A)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _errorMessage ?? "Resistor not detected clearly.",
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Scanning Tips for Better Accuracy:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Color(0xFF78350F),
+              ),
+            ),
+            const SizedBox(height: 6),
+            _buildTipItem('Move the resistor closer to the camera guide'),
+            _buildTipItem('Use good, uniform lighting without harsh reflections'),
+            _buildTipItem('Keep all resistor color bands clearly visible inside the guide'),
+            _buildTipItem('Place the resistor on a plain, light background'),
+            const SizedBox(height: 16),
+            if (_selectedImageBytes != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _hasScanError = false;
+                      _errorMessage = null;
+                      _isAdjustingImage = true;
+                    });
+                  },
+                  icon: const Icon(Icons.crop_free_rounded),
+                  label: const Text('Adjust Position Again'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF92400E),
+                    side: const BorderSide(color: Color(0xFFD97706)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (_capturedImageBytes != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _hasScanError = false;
+                      _errorMessage = null;
+                    });
+                  },
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: const Text('Enter Bands Manually'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0284C7),
+                    side: const BorderSide(color: Color(0xFF0284C7)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _resetScan,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildTipItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 4.0),
+            child: Icon(Icons.circle, size: 6, color: Color(0xFFB45309)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF78350F)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Results card showing detected bands, calculated values, and manual correction controls.
+  Widget _buildResultsSection(ResistorCalculationResult calculation) {
+    final b1 = ResistorScannerService.digitColors[_band1.clamp(0, 9)];
+    final b2 = ResistorScannerService.digitColors[_band2.clamp(0, 9)];
+    final b3Digit = ResistorScannerService.digitColors[_band3.clamp(0, 9)];
+    final b3Mult = ResistorScannerService.multiplierColors[_band3.clamp(0, ResistorScannerService.multiplierColors.length - 1)];
+    final b4Mult = ResistorScannerService.multiplierColors[_band4.clamp(0, ResistorScannerService.multiplierColors.length - 1)];
+    final b4Tol = ResistorScannerService.toleranceColors[_band4.clamp(0, ResistorScannerService.toleranceColors.length - 1)];
+    final b5Tol = ResistorScannerService.toleranceColors[_band5.clamp(0, ResistorScannerService.toleranceColors.length - 1)];
+    final b6Temp = ResistorScannerService.tempCoColors[_band6.clamp(0, ResistorScannerService.tempCoColors.length - 1)];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Detected Bands Summary Card with Band Count Selector
+        Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Detected Bands:',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569),
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Source: ${_lastScanDebugInfo?.preprocessingPass ?? "UNKNOWN"}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Resistor detected: ${(!_hasScanError && _lastScanDebugInfo?.preprocessingPass != 'NO_RESISTOR_FOUND' && _lastScanDebugInfo?.preprocessingPass != 'GEMINI_REJECTED') ? "YES" : "NO"}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Detected $_detectedBandCount bands',
+                            key: const Key('detected_band_count_text'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0284C7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Text(
+                          'Bands: ',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        DropdownButton<int>(
+                          key: const Key('scanner_band_count_dropdown'),
+                          value: const [4, 5, 6].contains(_selectedBandCount)
+                              ? _selectedBandCount
+                              : null,
+                          underline: const SizedBox(),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 4, child: Text('4 bands')),
+                            DropdownMenuItem(value: 5, child: Text('5 bands')),
+                            DropdownMenuItem(value: 6, child: Text('6 bands')),
+                          ],
+                          onChanged: (newCount) {
+                            if (newCount != null) {
+                              setState(() {
+                                _selectedBandCount = newCount;
+                                _clampBandIndices();
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _buildBandChip('Band 1', b1.name, b1.color),
+                    _buildBandChip('Band 2', b2.name, b2.color),
+                    if (_selectedBandCount == 4) ...[
+                      _buildBandChip('Band 3', b3Mult.name, b3Mult.color),
+                      _buildBandChip('Band 4', b4Tol.name, b4Tol.color),
+                    ] else ...[
+                      _buildBandChip('Band 3', b3Digit.name, b3Digit.color),
+                      _buildBandChip('Band 4', b4Mult.name, b4Mult.color),
+                      _buildBandChip('Band 5', b5Tol.name, b5Tol.color),
+                      if (_selectedBandCount == 6)
+                        _buildBandChip('Band 6', b6Temp.name, b6Temp.color),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 2. Calculated Value Card
+        Card(
+          elevation: 1.5,
+          color: const Color(0xFFF0FDFA),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF99F6E4)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Column(
+              children: [
+                const Text(
+                  'CALCULATED VALUE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0D9488),
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${calculation.readableNominal} ${calculation.toleranceLabel}',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${ResistorScannerService.formatResistance(calculation.nominalOhms)} nominal',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                if (_selectedBandCount == 6 && calculation.tempCoLabel != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBAE6FD)),
+                    ),
+                    child: Text(
+                      'Temp. Coefficient: ${calculation.tempCoLabel}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0369A1),
+                      ),
+                    ),
+                  ),
+                ],
+                const Divider(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildLimitText('Minimum', calculation.readableMin),
+                    _buildLimitText('Maximum', calculation.readableMax),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 3. Manual Correction Section
+        Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Manual Correction',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'If camera lighting affected any band, adjust it below:',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 12),
+
+                if (_selectedBandCount == 4) ...[
+                  // 4-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Multiplier), Band 4 (Tolerance)
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 1 (1st Digit)',
+                    value: _band1,
+                    onChanged: (val) => setState(() => _band1 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 2 (2nd Digit)',
+                    value: _band2,
+                    onChanged: (val) => setState(() => _band2 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildMultiplierCorrectionDropdown(
+                    label: 'Band 3 (Multiplier)',
+                    value: _band3,
+                    onChanged: (val) => setState(() => _band3 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildToleranceCorrectionDropdown(
+                    label: 'Band 4 (Tolerance)',
+                    value: _band4,
+                    onChanged: (val) => setState(() => _band4 = val!),
+                  ),
+                ] else if (_selectedBandCount == 5) ...[
+                  // 5-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Digit), Band 4 (Multiplier), Band 5 (Tolerance)
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 1 (1st Digit)',
+                    value: _band1,
+                    onChanged: (val) => setState(() => _band1 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 2 (2nd Digit)',
+                    value: _band2,
+                    onChanged: (val) => setState(() => _band2 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 3 (3rd Digit)',
+                    value: _band3,
+                    onChanged: (val) => setState(() => _band3 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildMultiplierCorrectionDropdown(
+                    label: 'Band 4 (Multiplier)',
+                    value: _band4,
+                    onChanged: (val) => setState(() => _band4 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildToleranceCorrectionDropdown(
+                    label: 'Band 5 (Tolerance)',
+                    value: _band5,
+                    onChanged: (val) => setState(() => _band5 = val!),
+                  ),
+                ] else ...[
+                  // 6-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Digit), Band 4 (Multiplier), Band 5 (Tolerance), Band 6 (TempCo)
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 1 (1st Digit)',
+                    value: _band1,
+                    onChanged: (val) => setState(() => _band1 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 2 (2nd Digit)',
+                    value: _band2,
+                    onChanged: (val) => setState(() => _band2 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildDigitCorrectionDropdown(
+                    label: 'Band 3 (3rd Digit)',
+                    value: _band3,
+                    onChanged: (val) => setState(() => _band3 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildMultiplierCorrectionDropdown(
+                    label: 'Band 4 (Multiplier)',
+                    value: _band4,
+                    onChanged: (val) => setState(() => _band4 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildToleranceCorrectionDropdown(
+                    label: 'Band 5 (Tolerance)',
+                    value: _band5,
+                    onChanged: (val) => setState(() => _band5 = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildTempCoCorrectionDropdown(
+                    label: 'Band 6 (Temp. Coefficient)',
+                    value: _band6,
+                    onChanged: (val) => setState(() => _band6 = val!),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 4. Action Buttons (Scan Again / Use These Bands)
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _resetScan,
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: const Text('Scan Again'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final confirmText = calculation.tempCoLabel != null
+                      ? 'Values Confirmed: ${calculation.readableNominal} ${calculation.toleranceLabel}, ${calculation.tempCoLabel}'
+                      : 'Values Confirmed: ${calculation.readableNominal} ${calculation.toleranceLabel}';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(confirmText),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Use These Bands'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static Widget _buildLimitText(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBandChip(String label, String colorName, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color == Colors.white ? Colors.grey : Colors.black12,
+                width: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$label: $colorName',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDigitCorrectionDropdown({
+    required String label,
+    required int value,
+    required ValueChanged<int?> onChanged,
+  }) {
+    final safeValue = value.clamp(0, ResistorScannerService.digitColors.length - 1);
+    return DropdownButtonFormField<int>(
+      key: ValueKey('$label-$safeValue'),
+      initialValue: safeValue,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      items: List.generate(ResistorScannerService.digitColors.length, (i) {
+        final b = ResistorScannerService.digitColors[i];
+        return DropdownMenuItem<int>(
+          value: i,
+          child: Row(
+            children: [
+              _buildColorCircle(b.color),
+              const SizedBox(width: 8),
+              Text('${b.name} (${b.value})'),
+            ],
+          ),
+        );
+      }),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildMultiplierCorrectionDropdown({
+    required String label,
+    required int value,
+    required ValueChanged<int?> onChanged,
+  }) {
+    final safeValue = value.clamp(0, ResistorScannerService.multiplierColors.length - 1);
+    return DropdownButtonFormField<int>(
+      key: ValueKey('$label-$safeValue'),
+      initialValue: safeValue,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      items: List.generate(ResistorScannerService.multiplierColors.length, (i) {
+        final b = ResistorScannerService.multiplierColors[i];
+        return DropdownMenuItem<int>(
+          value: i,
+          child: Row(
+            children: [
+              _buildColorCircle(b.color),
+              const SizedBox(width: 8),
+              Text('${b.name} (×${ResistorScannerService.formatResistance(b.multiplier)})'),
+            ],
+          ),
+        );
+      }),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildToleranceCorrectionDropdown({
+    required String label,
+    required int value,
+    required ValueChanged<int?> onChanged,
+  }) {
+    final safeValue = value.clamp(0, ResistorScannerService.toleranceColors.length - 1);
+    return DropdownButtonFormField<int>(
+      key: ValueKey('$label-$safeValue'),
+      initialValue: safeValue,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      items: List.generate(ResistorScannerService.toleranceColors.length, (i) {
+        final b = ResistorScannerService.toleranceColors[i];
+        final tolText = b.tolerance != null
+            ? (b.tolerance! < 1.0 ? '±${b.tolerance}%' : '±${b.tolerance!.toStringAsFixed(0)}%')
+            : '';
+        return DropdownMenuItem<int>(
+          value: i,
+          child: Row(
+            children: [
+              _buildColorCircle(b.color),
+              const SizedBox(width: 8),
+              Text('${b.name} ($tolText)'),
+            ],
+          ),
+        );
+      }),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildTempCoCorrectionDropdown({
+    required String label,
+    required int value,
+    required ValueChanged<int?> onChanged,
+  }) {
+    final safeValue = value.clamp(0, ResistorScannerService.tempCoColors.length - 1);
+    return DropdownButtonFormField<int>(
+      key: ValueKey('$label-$safeValue'),
+      initialValue: safeValue,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      items: List.generate(ResistorScannerService.tempCoColors.length, (i) {
+        final b = ResistorScannerService.tempCoColors[i];
+        return DropdownMenuItem<int>(
+          value: i,
+          child: Row(
+            children: [
+              _buildColorCircle(b.color),
+              const SizedBox(width: 8),
+              Text('${b.name} (${b.value} ppm/K)'),
+            ],
+          ),
+        );
+      }),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildColorCircle(Color color) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: color == Colors.white ? Colors.grey : Colors.black12,
+          width: 0.5,
+        ),
+      ),
+    );
+  }
+}
