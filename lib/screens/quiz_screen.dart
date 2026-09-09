@@ -235,18 +235,17 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text('Resistor Quiz'),
       ),
       body: FuturisticBackground(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 780),
-              child: _isQuizCompleted ? _buildResultsView() : _buildQuizView(),
-            ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 780),
+            child: _isQuizCompleted ? _buildResultsView() : _buildQuizView(),
           ),
         ),
       ),
@@ -261,7 +260,12 @@ class _QuizScreenState extends State<QuizScreen> {
     final isLastQuestion = _currentQuestionIndex == totalQuestions - 1;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      padding: EdgeInsets.fromLTRB(
+        16.0,
+        MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+        16.0,
+        MediaQuery.paddingOf(context).bottom + 40.0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -478,7 +482,12 @@ class _QuizScreenState extends State<QuizScreen> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+      padding: EdgeInsets.fromLTRB(
+        16.0,
+        MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+        16.0,
+        MediaQuery.paddingOf(context).bottom + 40.0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

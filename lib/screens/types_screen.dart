@@ -15,33 +15,37 @@ class TypesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text('Types of Resistors'),
       ),
       body: FuturisticBackground(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 90.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Top Overview Glass Banner
-                    _buildHeaderBanner(context),
-                    const SizedBox(height: 24),
-
-                    // CATEGORY 1: FIXED RESISTORS
-                    _buildCategoryHeading(
-                      context,
-                      title: '1. Fixed Resistors',
-                      subtitle:
-                          'Permanent ohmic resistance. Drag any 3D model to inspect in 360°.',
-                      badgeColor: const Color(0xFF00E5FF),
-                    ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16.0,
+                MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+                16.0,
+                MediaQuery.paddingOf(context).bottom + 40.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top Overview Glass Banner
+                  _buildHeaderBanner(context),
+                  const SizedBox(height: 24),
+                  // CATEGORY 1: FIXED RESISTORS
+                  _buildCategoryHeading(
+                    context,
+                    title: '1. Fixed Resistors',
+                    subtitle:
+                        'Permanent ohmic resistance. Drag any 3D model to inspect in 360°.',
+                    badgeColor: const Color(0xFF00E5FF),
+                  ),
                     const SizedBox(height: 14),
                     _buildResponsiveGrid(
                       context,
@@ -243,8 +247,7 @@ class TypesScreen extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// Banner at the top of the screen in visionOS frosted glass styling.

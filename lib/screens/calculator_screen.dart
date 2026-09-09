@@ -105,6 +105,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -118,13 +119,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         ],
       ),
       body: FuturisticBackground(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 860),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 80.0),
-                child: Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16.0,
+                MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+                16.0,
+                MediaQuery.paddingOf(context).bottom + 40.0,
+              ),
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                   // Number of Bands Selector
@@ -184,9 +189,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   /// Number of Bands selector with choices 4, 5, 6.
   Widget _buildBandCountSelector(ThemeData theme) {

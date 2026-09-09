@@ -110,8 +110,33 @@ class ResistorLabApp extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           ),
         ),
+        scrollbarTheme: const ScrollbarThemeData(
+          thumbVisibility: WidgetStatePropertyAll(false),
+          trackVisibility: WidgetStatePropertyAll(false),
+          interactive: false,
+          thickness: WidgetStatePropertyAll(0),
+        ),
       ),
+      scrollBehavior: const NoGlowNoScrollbarBehavior(),
       home: const HomeScreen(),
     );
+  }
+}
+
+/// Custom scroll behavior that removes all overscroll stretch/glow indicator bars
+/// and scrollbars across all platforms for a clean, uninterrupted interface.
+class NoGlowNoScrollbarBehavior extends MaterialScrollBehavior {
+  const NoGlowNoScrollbarBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+      BuildContext context, Widget child, ScrollableDetails details) {
+    return child;
+  }
+
+  @override
+  Widget buildScrollbar(
+      BuildContext context, Widget child, ScrollableDetails details) {
+    return child;
   }
 }

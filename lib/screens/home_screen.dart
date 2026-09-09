@@ -22,6 +22,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -37,13 +38,17 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
       body: FuturisticBackground(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 80.0),
-                child: Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16.0,
+                MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+                16.0,
+                MediaQuery.paddingOf(context).bottom + 40.0,
+              ),
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // 1. Polished Header Section
@@ -227,9 +232,8 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   /// Polished Header with "Basic Electronics Lab", "Resistor", and Subtitle.
   /// Polished Header with "Basic Electronics Lab", "Resistor", and Subtitle.

@@ -452,6 +452,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -473,13 +474,17 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
         ],
       ),
       body: FuturisticBackground(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-                child: Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16.0,
+                MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+                16.0,
+                MediaQuery.paddingOf(context).bottom + 40.0,
+              ),
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Camera / Image Viewfinder Container
@@ -521,8 +526,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildZoomPill(double targetZoom, String label) {
