@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Futuristic animated liquid glass background with smoothly orbiting chromatic
-/// plasma orbs and ascending translucent glass micro-bubbles.
+/// Futuristic animated liquid glass background featuring an ambient Siri-like
+/// circular wave with soft glowing blur, expanding and contracting organically.
 ///
 /// Pinned strictly to the screen viewport via a root [Stack] so that it remains
 /// static in screen space while the foreground content scrolls smoothly over it.
@@ -27,9 +27,9 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 22),
+      duration: const Duration(seconds: 14),
     );
-    // Avoid scheduling infinite animation frames in widget tests which would cause pumpAndSettle to time out
+    // Avoid scheduling infinite animation frames in widget tests
     final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
     if (!isTest) {
       _controller.repeat();
@@ -46,13 +46,13 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Viewport-Pinned Static Animated Canvas
+        // 1. Viewport-Pinned Static Animated Siri Circular Wave with Blur
         Positioned.fill(
           child: RepaintBoundary(
             child: AnimatedBuilder(
               animation: _controller,
               builder: (context, _) => CustomPaint(
-                painter: _AnimatedLiquidPlasmaPainter(_controller.value),
+                painter: _SiriWaveBackgroundPainter(_controller.value),
               ),
             ),
           ),
@@ -78,11 +78,11 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
   }
 }
 
-/// Smooth 60 FPS painter for drifting chromatic plasma orbs and ascending glass micro-bubbles.
-class _AnimatedLiquidPlasmaPainter extends CustomPainter {
+/// Painter for the ambient Siri-like circular glowing wave with harmonic ripples and soft blur.
+class _SiriWaveBackgroundPainter extends CustomPainter {
   final double progress;
 
-  _AnimatedLiquidPlasmaPainter(this.progress);
+  _SiriWaveBackgroundPainter(this.progress);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -90,145 +90,181 @@ class _AnimatedLiquidPlasmaPainter extends CustomPainter {
     final bgPaint = Paint()..color = const Color(0xFF030712);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
+    final center = Offset(size.width * 0.50, size.height * 0.42);
+    final baseRadius = math.min(size.width, size.height) * 0.36;
     final t = progress * 2.0 * math.pi;
 
-    // 2. Drifting Chromatic Plasma Orbs
-    // Orb A: Electric Cyber Cyan (Top-Left drifting)
-    final orbAx = size.width * 0.15 + math.sin(t) * 60;
-    final orbAy = size.height * 0.12 + math.cos(t * 0.8) * 45;
-    final orbAr = 240.0 + math.sin(t * 1.2) * 35;
-    _drawPlasmaOrb(
-      canvas,
-      Offset(orbAx, orbAy),
-      orbAr,
-      const Color(0xFF00E5FF),
-      alphaPeak: 0.24,
-    );
-
-    // Orb B: Radiant Ultraviolet (Right-Center drifting)
-    final orbBx = size.width * 0.88 + math.cos(t * 0.9) * 55;
-    final orbBy = size.height * 0.42 + math.sin(t * 1.1) * 65;
-    final orbBr = 260.0 + math.cos(t) * 40;
-    _drawPlasmaOrb(
-      canvas,
-      Offset(orbBx, orbBy),
-      orbBr,
-      const Color(0xFFA855F7),
-      alphaPeak: 0.22,
-    );
-
-    // Orb C: Electric Bioluminescent Teal (Left-Lower drifting)
-    final orbCx = size.width * 0.12 + math.cos(t * 0.7) * 45;
-    final orbCy = size.height * 0.72 + math.sin(t * 0.9) * 55;
-    final orbCr = 220.0 + math.sin(t * 0.8) * 30;
-    _drawPlasmaOrb(
-      canvas,
-      Offset(orbCx, orbCy),
-      orbCr,
-      const Color(0xFF14B8A6),
-      alphaPeak: 0.18,
-    );
-
-    // Orb D: Deep Azure Sapphire (Bottom-Right drifting)
-    final orbDx = size.width * 0.82 + math.sin(t * 1.3) * 50;
-    final orbDy = size.height * 0.88 + math.cos(t * 0.7) * 45;
-    final orbDr = 250.0 + math.sin(t * 0.9) * 35;
-    _drawPlasmaOrb(
-      canvas,
-      Offset(orbDx, orbDy),
-      orbDr,
-      const Color(0xFF3B82F6),
-      alphaPeak: 0.20,
-    );
-
-    // Orb E: Hot Plasma Magenta (Subtle Center Floating)
-    final orbEx = size.width * 0.50 + math.sin(t * 0.6) * 40;
-    final orbEy = size.height * 0.55 + math.cos(t * 0.8) * 50;
-    final orbEr = 200.0 + math.cos(t * 1.4) * 25;
-    _drawPlasmaOrb(
-      canvas,
-      Offset(orbEx, orbEy),
-      orbEr,
-      const Color(0xFFEC4899),
-      alphaPeak: 0.12,
-    );
-
-    // 3. Ascending Translucent Glass Micro-Bubbles
-    _drawGlassBubbles(canvas, size, progress);
-  }
-
-  void _drawPlasmaOrb(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    Color color, {
-    required double alphaPeak,
-  }) {
-    final paint = Paint()
+    // 2. Large soft ambient chromatic aura blur behind the Siri orb
+    final auraPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          color.withValues(alpha: alphaPeak),
-          color.withValues(alpha: alphaPeak * 0.45),
-          color.withValues(alpha: 0.0),
+          const Color(0xFF8B5CF6).withValues(alpha: 0.32),
+          const Color(0xFF00E5FF).withValues(alpha: 0.24),
+          const Color(0xFFEC4899).withValues(alpha: 0.16),
+          Colors.transparent,
         ],
-        stops: const [0.0, 0.48, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
+        stops: const [0.0, 0.42, 0.72, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: baseRadius * 1.9));
+    canvas.drawCircle(center, baseRadius * 1.9, auraPaint);
 
-    canvas.drawCircle(center, radius, paint);
+    // 3. Siri wave harmonic layers (expanding, contracting, and undulating with blur)
+    final waveLayers = [
+      _SiriWaveConfig(
+        color: const Color(0xFF00E5FF), // Electric Cyan
+        baseScale: 0.76,
+        pulseAmp: 0.16,
+        freq: 3,
+        waveAmp: 0.08,
+        speed: 1.0,
+        phase: 0.0,
+        blur: 16.0,
+      ),
+      _SiriWaveConfig(
+        color: const Color(0xFFA855F7), // Radiant Violet
+        baseScale: 0.92,
+        pulseAmp: 0.18,
+        freq: 4,
+        waveAmp: 0.10,
+        speed: -0.85,
+        phase: math.pi / 2,
+        blur: 20.0,
+      ),
+      _SiriWaveConfig(
+        color: const Color(0xFFEC4899), // Hot Magenta
+        baseScale: 1.06,
+        pulseAmp: 0.14,
+        freq: 3,
+        waveAmp: 0.09,
+        speed: 1.15,
+        phase: math.pi,
+        blur: 24.0,
+      ),
+      _SiriWaveConfig(
+        color: const Color(0xFF2563EB), // Deep Royal Blue
+        baseScale: 0.64,
+        pulseAmp: 0.12,
+        freq: 5,
+        waveAmp: 0.07,
+        speed: -1.1,
+        phase: math.pi * 1.5,
+        blur: 14.0,
+      ),
+      _SiriWaveConfig(
+        color: const Color(0xFFF59E0B), // Warm Glowing Amber
+        baseScale: 0.48,
+        pulseAmp: 0.20,
+        freq: 3,
+        waveAmp: 0.06,
+        speed: 0.9,
+        phase: math.pi * 0.7,
+        blur: 18.0,
+      ),
+    ];
+
+    for (final cfg in waveLayers) {
+      _drawHarmonicSiriWave(canvas, center, baseRadius, t, cfg);
+    }
+
+    // 4. Central intense glowing Siri core
+    final corePulse = 1.0 + 0.16 * math.sin(t * 1.4);
+    final corePaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.white.withValues(alpha: 0.50),
+          const Color(0xFF00E5FF).withValues(alpha: 0.38),
+          const Color(0xFFA855F7).withValues(alpha: 0.18),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.32, 0.68, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: baseRadius * 0.44 * corePulse));
+    canvas.drawCircle(center, baseRadius * 0.44 * corePulse, corePaint);
   }
 
-  void _drawGlassBubbles(Canvas canvas, Size size, double progress) {
-    const bubbleCount = 14;
-    for (int i = 0; i < bubbleCount; i++) {
-      final seedX = ((i * 37 + 11) % 100) / 100.0;
-      final speed = 0.4 + ((i * 19 + 7) % 10) / 15.0;
-      final bubbleRadius = 5.0 + ((i * 29 + 13) % 11).toDouble();
+  void _drawHarmonicSiriWave(
+    Canvas canvas,
+    Offset center,
+    double baseRadius,
+    double t,
+    _SiriWaveConfig cfg,
+  ) {
+    final pulse = 1.0 + cfg.pulseAmp * math.sin(t * cfg.speed + cfg.phase);
+    final r0 = baseRadius * cfg.baseScale * pulse;
 
-      final yProgress = (progress * speed + (i / bubbleCount)) % 1.0;
-      final y = size.height * (1.0 - yProgress);
+    final path = Path();
+    const steps = 72;
+    for (int i = 0; i <= steps; i++) {
+      final theta = (i / steps) * 2.0 * math.pi;
+      final wave = cfg.waveAmp * math.sin(cfg.freq * theta + t * cfg.speed + cfg.phase) +
+                   (cfg.waveAmp * 0.5) * math.cos((cfg.freq + 2) * theta - t);
+      final r = r0 * (1.0 + wave);
+      final x = center.dx + math.cos(theta) * r;
+      final y = center.dy + math.sin(theta) * r;
 
-      final sway = math.sin((progress * 2.0 * math.pi) + (i * 1.5)) * 18.0;
-      final x = (size.width * seedX + sway).clamp(bubbleRadius * 2, size.width - bubbleRadius * 2);
-
-      final center = Offset(x, y);
-
-      final bubbleFill = Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.35, -0.35),
-          colors: [
-            Colors.white.withValues(alpha: 0.15),
-            const Color(0xFF00E5FF).withValues(alpha: 0.06),
-            Colors.white.withValues(alpha: 0.02),
-          ],
-          stops: const [0.0, 0.6, 1.0],
-        ).createShader(Rect.fromCircle(center: center, radius: bubbleRadius));
-      canvas.drawCircle(center, bubbleRadius, bubbleFill);
-
-      final rimPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.45),
-            Colors.white.withValues(alpha: 0.10),
-            const Color(0xFF00E5FF).withValues(alpha: 0.30),
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: bubbleRadius));
-      canvas.drawCircle(center, bubbleRadius, rimPaint);
-
-      final gleamCenter = center + Offset(-bubbleRadius * 0.35, -bubbleRadius * 0.35);
-      final gleamPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.65)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(gleamCenter, bubbleRadius * 0.22, gleamPaint);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
     }
+    path.close();
+
+    // Soft blurred glowing fill
+    final fillPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, cfg.blur)
+      ..shader = RadialGradient(
+        colors: [
+          cfg.color.withValues(alpha: 0.22),
+          cfg.color.withValues(alpha: 0.08),
+          Colors.transparent,
+        ],
+        stops: const [0.2, 0.75, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: r0 * 1.25));
+
+    canvas.drawPath(path, fillPaint);
+
+    // Glowing wave perimeter rim
+    final rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, cfg.blur * 0.5)
+      ..shader = SweepGradient(
+        colors: [
+          cfg.color.withValues(alpha: 0.75),
+          const Color(0xFF00E5FF).withValues(alpha: 0.55),
+          const Color(0xFFEC4899).withValues(alpha: 0.65),
+          cfg.color.withValues(alpha: 0.75),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: r0));
+
+    canvas.drawPath(path, rimPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _AnimatedLiquidPlasmaPainter oldDelegate) =>
+  bool shouldRepaint(covariant _SiriWaveBackgroundPainter oldDelegate) =>
       oldDelegate.progress != progress;
+}
+
+class _SiriWaveConfig {
+  final Color color;
+  final double baseScale;
+  final double pulseAmp;
+  final int freq;
+  final double waveAmp;
+  final double speed;
+  final double phase;
+  final double blur;
+
+  _SiriWaveConfig({
+    required this.color,
+    required this.baseScale,
+    required this.pulseAmp,
+    required this.freq,
+    required this.waveAmp,
+    required this.speed,
+    required this.phase,
+    required this.blur,
+  });
 }
 
 /// Custom painter for subtle holographic technical grid points.
@@ -238,13 +274,13 @@ class _TechGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final dotPaint = Paint()
-      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.05)
+      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.04)
       ..style = PaintingStyle.fill;
 
     const spacing = 36.0;
     for (double x = 18; x < size.width; x += spacing) {
       for (double y = 18; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), 0.9, dotPaint);
+        canvas.drawCircle(Offset(x, y), 0.85, dotPaint);
       }
     }
   }
@@ -253,7 +289,11 @@ class _TechGridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Apple visionOS & Liquid Glass inspired Bubbly Translucent Glass Container.
+/// Apple visionOS & Liquid Glass inspired Translucent Glass Container.
+///
+/// Designed with calibrated translucency (alpha: 0.22) so that the undulating Siri
+/// glowing circular wave in the background remains clearly visible through the glass cards,
+/// while providing crisp frosted refraction, specular meniscus glare, and beveled edges.
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double borderRadius;
@@ -273,15 +313,16 @@ class GlassContainer extends StatelessWidget {
     this.margin,
     this.tintColor,
     this.glowColor,
-    this.blurSigma = 14.0,
+    this.blurSigma = 18.0,
     this.borderWidth = 1.3,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Calibrated translucency (alpha: 0.22) allows the colorful background to shine through
     final effectiveTint =
-        tintColor ?? const Color(0xFF0B1322).withValues(alpha: 0.70);
+        tintColor ?? const Color(0xFF0F172A).withValues(alpha: 0.22);
 
     Widget content = Container(
       padding: padding ?? const EdgeInsets.all(20.0),
@@ -292,10 +333,10 @@ class GlassContainer extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.20),
-            Colors.white.withValues(alpha: 0.07),
-            Colors.white.withValues(alpha: 0.02),
-            (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.16),
+            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.01),
+            (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.06),
           ],
           stops: const [0.0, 0.25, 0.70, 1.0],
         ),
@@ -322,14 +363,16 @@ class GlassContainer extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
+            // Soft ambient occlusion shadow
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.55),
-              blurRadius: 28,
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 26,
               offset: const Offset(0, 10),
             ),
+            // Chromatic ambient caustic bloom
             BoxShadow(
-              color: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.22),
-              blurRadius: 32,
+              color: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.20),
+              blurRadius: 30,
               spreadRadius: -2,
               offset: const Offset(0, 6),
             ),
@@ -388,10 +431,10 @@ class _BubblyGlassBorderPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.92),
-          (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.70),
-          Colors.white.withValues(alpha: 0.12),
-          (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.35),
+          Colors.white.withValues(alpha: 0.90),
+          (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.65),
+          Colors.white.withValues(alpha: 0.10),
+          (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.30),
         ],
         stops: const [0.0, 0.24, 0.65, 1.0],
       ).createShader(rect);
@@ -412,7 +455,7 @@ class _BubblyGlassBorderPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: 0.30),
+            Colors.white.withValues(alpha: 0.28),
             Colors.white.withValues(alpha: 0.0),
           ],
           stops: const [0.0, 0.40],
@@ -423,7 +466,7 @@ class _BubblyGlassBorderPainter extends CustomPainter {
 
     // 3. Convex Specular Meniscus Glare (curved bubble sheen on top shoulder)
     if (size.width > 40 && size.height > 40) {
-      final meniscusHeight = math.min(size.height * 0.40, 36.0);
+      final meniscusHeight = math.min(size.height * 0.38, 32.0);
       final meniscusRect = Rect.fromLTWH(
         borderWidth,
         borderWidth,
@@ -434,8 +477,8 @@ class _BubblyGlassBorderPainter extends CustomPainter {
         meniscusRect,
         topLeft: Radius.circular(borderRadius - borderWidth),
         topRight: Radius.circular(borderRadius - borderWidth),
-        bottomLeft: const Radius.circular(16),
-        bottomRight: const Radius.circular(16),
+        bottomLeft: const Radius.circular(14),
+        bottomRight: const Radius.circular(14),
       );
 
       final meniscusPaint = Paint()
@@ -444,11 +487,11 @@ class _BubblyGlassBorderPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: 0.22),
-            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.20),
+            Colors.white.withValues(alpha: 0.04),
             Colors.white.withValues(alpha: 0.0),
           ],
-          stops: const [0.0, 0.55, 1.0],
+          stops: const [0.0, 0.50, 1.0],
         ).createShader(meniscusRect);
 
       canvas.drawRRect(meniscusRRect, meniscusPaint);
@@ -564,7 +607,7 @@ class LiquidGlassIconLens extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF0B1322).withValues(alpha: 0.82),
+        color: const Color(0xFF0B1322).withValues(alpha: 0.55),
         border: Border.all(
           color: accentColor.withValues(alpha: 0.55),
           width: 1.4,
@@ -576,7 +619,7 @@ class LiquidGlassIconLens extends StatelessWidget {
             spreadRadius: -2,
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.50),
+            color: Colors.black.withValues(alpha: 0.45),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -585,9 +628,9 @@ class LiquidGlassIconLens extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.30),
-            accentColor.withValues(alpha: 0.20),
-            const Color(0xFF070C16).withValues(alpha: 0.75),
+            Colors.white.withValues(alpha: 0.28),
+            accentColor.withValues(alpha: 0.18),
+            const Color(0xFF070C16).withValues(alpha: 0.50),
           ],
           stops: const [0.0, 0.38, 1.0],
         ),
@@ -779,7 +822,7 @@ class GlassButton extends StatelessWidget {
       glowColor: isPrimary ? accentColor : null,
       tintColor: isPrimary
           ? accentColor.withValues(alpha: 0.28)
-          : const Color(0xFF0F172A).withValues(alpha: 0.70),
+          : const Color(0xFF0F172A).withValues(alpha: 0.35),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,

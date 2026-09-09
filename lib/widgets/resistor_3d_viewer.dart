@@ -69,7 +69,7 @@ class Vector3 {
   }
 }
 
-/// A 3D polygon face for realistic solid rendering.
+/// A 3D triangular face for realistic, watertight solid rendering.
 class Face3D {
   final List<Vector3> vertices;
   final Color baseColor;
@@ -95,7 +95,7 @@ class Face3D {
   }
 }
 
-/// A 3D line segment (for leads, coils, tracks, and silkscreen lines).
+/// A 3D line segment (for tracks, fine coils, or silkscreen text).
 class Line3D {
   final Vector3 start;
   final Vector3 end;
@@ -123,7 +123,7 @@ class Resistor3DViewer extends StatefulWidget {
   const Resistor3DViewer({
     super.key,
     required this.type,
-    this.height = 175,
+    this.height = 180,
     this.enableGesture = true,
     this.showInspectButton = true,
     this.title,
@@ -155,7 +155,7 @@ class _Resistor3DViewerState extends State<Resistor3DViewer> {
         height: widget.height,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFF070C18).withValues(alpha: 0.90),
+          color: const Color(0xFF070C18).withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: const Color(0xFF00E5FF).withValues(alpha: 0.40),
@@ -591,16 +591,14 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
   }
 }
 
-/// Canvas painter for realistic 3D component rendering with robust backface culling,
-/// correct Painter's algorithm depth sorting, and Phong specular highlights.
+/// Canvas painter for 100% solid, full-bodied 3D components.
 class _Resistor3DPainter extends CustomPainter {
   final Resistor3DType type;
   final double yaw;
   final double pitch;
   final double zoom;
 
-  static const double focalLength = 360.0;
-  // Directional light from upper-left-front
+  static const double focalLength = 380.0;
   static final Vector3 lightDir = const Vector3(-0.35, -0.65, -0.65).normalized;
 
   _Resistor3DPainter({
@@ -617,10 +615,10 @@ class _Resistor3DPainter extends CustomPainter {
     final rawFaces = <Face3D>[];
     final rawLines = <Line3D>[];
 
-    // 1. Generate 3D geometry
+    // 1. Build geometry
     _generateGeometry(rawFaces, rawLines);
 
-    // 2. Rotate and scale vertices into Camera Space
+    // 2. Rotate into camera space
     final transformedFaces = <Face3D>[];
     for (final face in rawFaces) {
       final tVerts = face.vertices.map((v) {
@@ -648,25 +646,25 @@ class _Resistor3DPainter extends CustomPainter {
       ));
     }
 
-    // 3. Project & Apply Screen-Space Backface Culling
+    // 3. Project & sort depth
     final renderables = <_Renderable>[];
 
     for (final face in transformedFaces) {
       if (face.vertices.length < 3) continue;
 
+      // 3D camera-space normal check
+      final v0 = face.vertices[0];
+      final v1 = face.vertices[1];
+      final v2 = face.vertices[2];
+      final normal = (v1 - v0).cross(v2 - v0);
+
+      // In camera space looking along +Z, if normal.z > 0, it points away from camera
+      // Culling true backfaces prevents drawing interior faces while maintaining solid look
+      if (normal.z > 0.05 && !face.doubleSided) {
+        continue;
+      }
+
       final projectedPts = face.vertices.map((v) => _project(center, v)).toList();
-
-      // Screen-space 2D signed area calculation
-      double signedArea = 0;
-      for (int i = 0; i < projectedPts.length; i++) {
-        final j = (i + 1) % projectedPts.length;
-        signedArea += projectedPts[i].dx * projectedPts[j].dy - projectedPts[j].dx * projectedPts[i].dy;
-      }
-
-      // Backface Culling: If signedArea <= 0 and not doubleSided, the face points AWAY from camera.
-      if (signedArea <= 0 && !face.doubleSided) {
-        continue; // Cull backface!
-      }
 
       renderables.add(_Renderable(
         z: face.avgZ,
@@ -675,7 +673,6 @@ class _Resistor3DPainter extends CustomPainter {
       ));
     }
 
-    // Lines are never culled by winding
     for (final line in transformedLines) {
       renderables.add(_Renderable(
         z: line.avgZ,
@@ -683,10 +680,10 @@ class _Resistor3DPainter extends CustomPainter {
       ));
     }
 
-    // 4. Correct Painter's Algorithm: Furthest away (largest Z) drawn first!
+    // Sort descending: furthest elements painted first, closest in front
     renderables.sort((a, b) => b.z.compareTo(a.z));
 
-    // 5. Render sorted items
+    // 4. Render
     for (final item in renderables) {
       if (item.line != null) {
         _renderLine(canvas, center, item.line!);
@@ -717,20 +714,15 @@ class _Resistor3DPainter extends CustomPainter {
       final v0 = face.vertices[0];
       final v1 = face.vertices[1];
       final v2 = face.vertices[2];
+      final normal = (v1 - v0).cross(v2 - v0).normalized;
 
-      final edge1 = v1 - v0;
-      final edge2 = v2 - v0;
-      final normal = edge1.cross(edge2).normalized;
-
-      // Diffuse factor (dot product with incoming light)
       final nDotL = -normal.dot(lightDir);
-      final diffuse = (0.32 + 0.68 * math.max(0.0, nDotL)).clamp(0.0, 1.0);
+      final diffuse = (0.35 + 0.65 * math.max(0.0, nDotL)).clamp(0.0, 1.0);
 
-      // Specular Phong highlight (reflection towards camera at 0,0,-1)
       final rZ = lightDir.z - 2.0 * (lightDir.dot(normal)) * normal.z;
       final specBase = math.max(0.0, -rZ);
       final specPower = face.isMetallic ? 14.0 : 4.0;
-      final specIntensity = face.isMetallic ? 0.65 : 0.25;
+      final specIntensity = face.isMetallic ? 0.60 : 0.20;
       final spec = math.pow(specBase, specPower) * specIntensity;
 
       final baseR = (face.baseColor.r * 255.0).round();
@@ -757,15 +749,6 @@ class _Resistor3DPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     canvas.drawPath(path, paint);
-
-    // Subtle edge highlight for 3D polygon definition
-    if (face.vertices.length <= 4) {
-      final edgePaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.12)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.5;
-      canvas.drawPath(path, edgePaint);
-    }
   }
 
   Offset _project(Offset center, Vector3 v) {
@@ -774,16 +757,16 @@ class _Resistor3DPainter extends CustomPainter {
   }
 
   // ===========================================================================
-  // ACCURATE 3D RESISTOR GEOMETRY GENERATORS
+  // 100% SOLID WATERTIGHT 3D MODEL GENERATORS
   // ===========================================================================
 
   void _generateGeometry(List<Face3D> faces, List<Line3D> lines) {
     switch (type) {
       case Resistor3DType.carbonComposition:
-        _buildAxialDogboneResistor(
+        _buildSolidAxialLathe(
           faces,
           lines,
-          bodyColor: const Color(0xFF2C221C), // Authentic dark phenolic charcoal
+          bodyColor: const Color(0xFF2C221C), // Phenolic charcoal
           bands: [
             const Color(0xFF9A5B2D), // Brown (1)
             Colors.black,            // Black (0)
@@ -794,7 +777,7 @@ class _Resistor3DPainter extends CustomPainter {
         break;
 
       case Resistor3DType.carbonFilm:
-        _buildAxialDogboneResistor(
+        _buildSolidAxialLathe(
           faces,
           lines,
           bodyColor: const Color(0xFFD4B07B), // Warm beige ceramic
@@ -809,10 +792,10 @@ class _Resistor3DPainter extends CustomPainter {
         break;
 
       case Resistor3DType.metalFilm:
-        _buildAxialDogboneResistor(
+        _buildSolidAxialLathe(
           faces,
           lines,
-          bodyColor: const Color(0xFF0284C7), // High precision sky-blue
+          bodyColor: const Color(0xFF0284C7), // Precision sky-blue
           bands: [
             const Color(0xFF9A5B2D), // Brown (1)
             Colors.black,            // Black (0)
@@ -861,8 +844,8 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// 1. Axial Dogbone Resistor (Flared shoulders, color bands, metal leads)
-  void _buildAxialDogboneResistor(
+  /// 1. Continuous Lathe Surface of Revolution for Axial Resistors (100% Watertight Solid)
+  void _buildSolidAxialLathe(
     List<Face3D> faces,
     List<Line3D> lines, {
     required Color bodyColor,
@@ -870,72 +853,108 @@ class _Resistor3DPainter extends CustomPainter {
     bool hasHelicalGroove = false,
   }) {
     const halfLen = 38.0;
-    const shoulderLen = 10.0;
-    const bodyRadius = 15.0;
-    const shoulderRadius = 12.0;
-    const segments = 16;
+    const bodyR = 15.0;
+    const neckR = 14.2;
+    const shoulderR = 16.0;
+    const capR = 12.0;
+    const segs = 18;
 
-    // Tinned Copper Axial Wire Leads
-    lines.add(Line3D(
-      start: const Vector3(-halfLen - 50, 0, 0),
-      end: const Vector3(-halfLen, 0, 0),
-      color: const Color(0xFFE2E8F0),
-      strokeWidth: 4.0,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(halfLen, 0, 0),
-      end: const Vector3(halfLen + 50, 0, 0),
-      color: const Color(0xFFE2E8F0),
-      strokeWidth: 4.0,
-    ));
+    // Solid 3D Metallic Cylindrical Leads
+    _buildSolidCylinderX(faces, const Vector3(-halfLen - 46, 0, 0), 46, 2.5, 10,
+        const Color(0xFFE2E8F0), isMetallic: true);
+    _buildSolidCylinderX(faces, const Vector3(halfLen, 0, 0), 46, 2.5, 10,
+        const Color(0xFFE2E8F0), isMetallic: true);
 
-    // Silver End Caps
-    _buildCylinderX(faces, const Vector3(-halfLen - 4, 0, 0), 4, 11.5, segments,
-        const Color(0xFFCBD5E1), isMetallic: true);
-    _buildCylinderX(faces, const Vector3(halfLen, 0, 0), 4, 11.5, segments,
-        const Color(0xFFCBD5E1), isMetallic: true);
+    // Profile of continuous solid dogbone lathe: [x, radius, isCap, isBand, color]
+    final profile = <_LatheSlice>[
+      _LatheSlice(-halfLen, capR, const Color(0xFFCBD5E1), isMetallic: true),
+      _LatheSlice(-halfLen + 4, capR, const Color(0xFFCBD5E1), isMetallic: true),
+      _LatheSlice(-halfLen + 9, shoulderR, bodyColor),
+      _LatheSlice(-halfLen + 15, neckR, bodyColor),
+    ];
 
-    // Left Flared Shoulder
-    _buildTaperedCylinderX(
-      faces,
-      const Vector3(-halfLen, 0, 0),
-      shoulderLen,
-      radius1: shoulderRadius,
-      radius2: bodyRadius,
-      segments: segments,
-      color: bodyColor,
-    );
+    // Slices for color bands and body
+    final centerSpan = (halfLen - 15) * 2;
+    final bandSpacing = centerSpan / (bands.length + 1);
+    for (int b = 0; b < bands.length; b++) {
+      final bx = -halfLen + 15 + (b + 1) * bandSpacing;
+      profile.add(_LatheSlice(bx - 2.5, bodyR, bodyColor));
+      profile.add(_LatheSlice(bx - 2.2, bodyR + 0.35, bands[b]));
+      profile.add(_LatheSlice(bx + 2.2, bodyR + 0.35, bands[b]));
+      profile.add(_LatheSlice(bx + 2.5, bodyR, bodyColor));
+    }
 
-    // Main Central Resistor Body
-    final centerLen = (halfLen - shoulderLen) * 2;
-    _buildCylinderX(faces, Vector3(-halfLen + shoulderLen, 0, 0), centerLen,
-        bodyRadius, segments, bodyColor);
+    profile.addAll([
+      _LatheSlice(halfLen - 15, neckR, bodyColor),
+      _LatheSlice(halfLen - 9, shoulderR, bodyColor),
+      _LatheSlice(halfLen - 4, capR, const Color(0xFFCBD5E1), isMetallic: true),
+      _LatheSlice(halfLen, capR, const Color(0xFFCBD5E1), isMetallic: true),
+    ]);
 
-    // Right Flared Shoulder
-    _buildTaperedCylinderX(
-      faces,
-      Vector3(halfLen - shoulderLen, 0, 0),
-      shoulderLen,
-      radius1: bodyRadius,
-      radius2: shoulderRadius,
-      segments: segments,
-      color: bodyColor,
-    );
+    // Generate ring vertices
+    final rings = <List<Vector3>>[];
+    for (final s in profile) {
+      final ring = <Vector3>[];
+      for (int i = 0; i < segs; i++) {
+        final a = (i / segs) * 2 * math.pi;
+        ring.add(Vector3(s.x, math.cos(a) * s.radius, math.sin(a) * s.radius));
+      }
+      rings.add(ring);
+    }
 
-    // Color Bands
-    final bandSpan = centerLen * 0.85;
-    final bandSpacing = bandSpan / (bands.length + 1);
-    for (int i = 0; i < bands.length; i++) {
-      final startX = -centerLen / 2 + (i + 1) * bandSpacing - 2.2;
-      _buildCylinderX(faces, Vector3(startX, 0, 0), 4.4, bodyRadius + 0.4,
-          segments, bands[i]);
+    // Connect adjacent slices with solid triangles
+    for (int r = 0; r < rings.length - 1; r++) {
+      final r1 = rings[r];
+      final r2 = rings[r + 1];
+      final color = profile[r].color;
+      final isMetallic = profile[r].isMetallic;
+
+      for (int i = 0; i < segs; i++) {
+        final next = (i + 1) % segs;
+        final p1 = r1[i];
+        final p2 = r1[next];
+        final p3 = r2[next];
+        final p4 = r2[i];
+
+        faces.add(Face3D(
+          vertices: [p1, p2, p3],
+          baseColor: color,
+          isMetallic: isMetallic,
+        ));
+        faces.add(Face3D(
+          vertices: [p1, p3, p4],
+          baseColor: color,
+          isMetallic: isMetallic,
+        ));
+      }
+    }
+
+    // Sealed solid end caps
+    final leftCenter = Vector3(profile.first.x, 0, 0);
+    for (int i = 0; i < segs; i++) {
+      final next = (i + 1) % segs;
+      faces.add(Face3D(
+        vertices: [leftCenter, rings.first[next], rings.first[i]],
+        baseColor: const Color(0xFFCBD5E1),
+        isMetallic: true,
+      ));
+    }
+
+    final rightCenter = Vector3(profile.last.x, 0, 0);
+    for (int i = 0; i < segs; i++) {
+      final next = (i + 1) % segs;
+      faces.add(Face3D(
+        vertices: [rightCenter, rings.last[i], rings.last[next]],
+        baseColor: const Color(0xFFCBD5E1),
+        isMetallic: true,
+      ));
     }
 
     // Helical Spiral Cut for Carbon Film Resistor
     if (hasHelicalGroove) {
-      for (double x = -centerLen / 2 + 4; x < centerLen / 2 - 4; x += 1.8) {
+      for (double x = -halfLen + 15; x < halfLen - 15; x += 1.8) {
         final angle = (x * 0.50);
-        final p = Vector3(x, math.cos(angle) * (bodyRadius + 0.6), math.sin(angle) * (bodyRadius + 0.6));
+        final p = Vector3(x, math.cos(angle) * (bodyR + 0.5), math.sin(angle) * (bodyR + 0.5));
         lines.add(Line3D(
           start: p,
           end: p + const Vector3(1.4, 0.6, 0.6),
@@ -948,77 +967,69 @@ class _Resistor3DPainter extends CustomPainter {
 
   /// 2. Wire Wound Resistor with visible metallic Nichrome coils
   void _buildWireWoundResistor(List<Face3D> faces, List<Line3D> lines) {
-    const radius = 18.0;
-    const length = 86.0;
-    const segments = 16;
+    const radius = 17.0;
+    const length = 84.0;
+    const segs = 18;
 
-    // Heavy Tinned Axial Leads
-    lines.add(Line3D(
-      start: const Vector3(-length / 2 - 48, 0, 0),
-      end: const Vector3(-length / 2, 0, 0),
-      color: const Color(0xFFF1F5F9),
-      strokeWidth: 4.5,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(length / 2, 0, 0),
-      end: const Vector3(length / 2 + 48, 0, 0),
-      color: const Color(0xFFF1F5F9),
-      strokeWidth: 4.5,
-    ));
+    // Solid Leads
+    _buildSolidCylinderX(faces, const Vector3(-length / 2 - 46, 0, 0), 46, 2.5, 10,
+        const Color(0xFFF1F5F9), isMetallic: true);
+    _buildSolidCylinderX(faces, Vector3(length / 2, 0, 0), 46, 2.5, 10,
+        const Color(0xFFF1F5F9), isMetallic: true);
 
-    // Ceramic Porcelain Core Cylinder
-    _buildCylinderX(faces, Vector3(-length / 2, 0, 0), length, radius, segments,
+    // Ceramic Porcelain Core Cylinder (Solid)
+    _buildSolidCylinderX(faces, Vector3(-length / 2, 0, 0), length, radius, segs,
         const Color(0xFFF8FAFC));
 
     // Vitreous protective enamel collars (Dark Green)
-    _buildCylinderX(faces, Vector3(-length / 2, 0, 0), 14, radius + 1.2, segments,
+    _buildSolidCylinderX(faces, Vector3(-length / 2, 0, 0), 14, radius + 1.2, segs,
         const Color(0xFF15803D), isMetallic: true);
-    _buildCylinderX(faces, Vector3(length / 2 - 14, 0, 0), 14, radius + 1.2, segments,
+    _buildSolidCylinderX(faces, Vector3(length / 2 - 14, 0, 0), 14, radius + 1.2, segs,
         const Color(0xFF15803D), isMetallic: true);
 
     // Realistic Coiled Wire Windings (Nichrome Wire)
     const coils = 16;
     for (int i = 0; i < coils; i++) {
       final x = -length / 2 + 16 + i * ((length - 32) / coils);
-      for (int s = 0; s < segments; s++) {
-        final a1 = (s / segments) * 2 * math.pi;
-        final a2 = ((s + 1) / segments) * 2 * math.pi;
+      for (int s = 0; s < segs; s++) {
+        final a1 = (s / segs) * 2 * math.pi;
+        final a2 = ((s + 1) / segs) * 2 * math.pi;
         lines.add(Line3D(
           start: Vector3(x, math.cos(a1) * (radius + 1.0), math.sin(a1) * (radius + 1.0)),
           end: Vector3(x + 1.2, math.cos(a2) * (radius + 1.0), math.sin(a2) * (radius + 1.0)),
-          color: const Color(0xFFD97706), // Nichrome copper alloy
+          color: const Color(0xFFD97706),
           strokeWidth: 2.2,
         ));
       }
     }
   }
 
-  /// 3. Potentiometer (Correct Z-axis orientation: metal can, brass bushing, hex nut, shaft, lugs)
+  /// 3. Potentiometer (Solid cylindrical metal can, brass bushing, hex nut, shaft, lugs)
   void _buildPotentiometer(List<Face3D> faces, List<Line3D> lines) {
-    // 1. Metal Cylindrical Housing Can (oriented along Z)
-    _buildCylinderZ(
+    // 1. Metal Cylindrical Housing Can (along Z)
+    _buildSolidCylinderZ(
       faces,
       const Vector3(0, -6, -20),
       20.0,
       24.0,
-      16,
+      18,
       const Color(0xFF64748B),
       isMetallic: true,
     );
 
     // 2. Threaded Brass Bushing Collar
-    _buildCylinderZ(
+    _buildSolidCylinderZ(
       faces,
       const Vector3(0, -6, 0),
       14.0,
       11.0,
-      16,
+      18,
       const Color(0xFFCA8A04),
       isMetallic: true,
     );
 
     // 3. Stamped Hexagonal Locking Nut (6-sided prism)
-    _buildCylinderZ(
+    _buildSolidCylinderZ(
       faces,
       const Vector3(0, -6, 4),
       4.0,
@@ -1029,12 +1040,12 @@ class _Resistor3DPainter extends CustomPainter {
     );
 
     // 4. Rotating Metal Control Shaft
-    _buildCylinderZ(
+    _buildSolidCylinderZ(
       faces,
       const Vector3(0, -6, 14),
       24.0,
       7.0,
-      14,
+      16,
       const Color(0xFFE2E8F0),
       isMetallic: true,
     );
@@ -1050,7 +1061,7 @@ class _Resistor3DPainter extends CustomPainter {
     // 5. 3 Stamped Solder Lugs (Bottom)
     for (int i = -1; i <= 1; i++) {
       final x = i * 14.0;
-      _buildBox(
+      _buildSolidBox(
         faces,
         Vector3(x - 3.5, 18, -12),
         const Vector3(7, 24, 2.5),
@@ -1058,7 +1069,6 @@ class _Resistor3DPainter extends CustomPainter {
         isMetallic: true,
       );
 
-      // Terminal Eyelet hole outline
       lines.add(Line3D(
         start: Vector3(x - 2, 36, -10.5),
         end: Vector3(x + 2, 36, -10.5),
@@ -1073,8 +1083,8 @@ class _Resistor3DPainter extends CustomPainter {
     const length = 88.0;
     const radius = 18.0;
 
-    // Ceramic Porcelain Coil Tube
-    _buildCylinderX(faces, Vector3(-length / 2, 6, 0), length, radius, 16,
+    // Ceramic Coil Tube
+    _buildSolidCylinderX(faces, Vector3(-length / 2, 6, 0), length, radius, 18,
         const Color(0xFFF1F5F9));
 
     // Wire winding coils
@@ -1091,37 +1101,33 @@ class _Resistor3DPainter extends CustomPainter {
       }
     }
 
-    // Top Chrome Slider Guide Rod
-    lines.add(Line3D(
-      start: const Vector3(-length / 2 - 10, -20, 0),
-      end: const Vector3(length / 2 + 10, -20, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 5.0,
-    ));
+    // Top Chrome Slider Guide Rod (Solid Cylinder)
+    _buildSolidCylinderX(faces, const Vector3(-length / 2 - 10, -20, 0), length + 20, 2.5, 10,
+        const Color(0xFFCBD5E1), isMetallic: true);
 
     // Wiper Slider Carriage Block (Cyan / Blue)
-    _buildBox(faces, const Vector3(-8, -26, -8), const Vector3(16, 12, 16),
+    _buildSolidBox(faces, const Vector3(-8, -26, -8), const Vector3(16, 12, 16),
         const Color(0xFF0284C7), isMetallic: true);
 
     // Brass Wiper Contact Finger
-    _buildBox(faces, const Vector3(-4, -14, -4), const Vector3(8, 8, 8),
+    _buildSolidBox(faces, const Vector3(-4, -14, -4), const Vector3(8, 8, 8),
         const Color(0xFFCA8A04), isMetallic: true);
 
     // Heavy Brass Terminal Binding Posts
-    _buildCylinderZ(faces, Vector3(-length / 2 - 6, 20, -4), 8, 5, 8,
+    _buildSolidCylinderZ(faces, Vector3(-length / 2 - 6, 20, -4), 8, 5, 10,
         const Color(0xFFEAB308), isMetallic: true);
-    _buildCylinderZ(faces, Vector3(length / 2 - 2, 20, -4), 8, 5, 8,
+    _buildSolidCylinderZ(faces, Vector3(length / 2 - 2, 20, -4), 8, 5, 10,
         const Color(0xFFEAB308), isMetallic: true);
   }
 
   /// 5. Preset Trimmer (Bourns 3296 sealed blue cermet case, golden screw, 3 pins)
   void _buildTrimmer(List<Face3D> faces, List<Line3D> lines) {
     // Ultramarine Blue Casing
-    _buildBox(faces, const Vector3(-24, -24, -16), const Vector3(48, 46, 32),
+    _buildSolidBox(faces, const Vector3(-24, -24, -16), const Vector3(48, 46, 32),
         const Color(0xFF1D4ED8));
 
     // Top Brass Adjustment Screw Head
-    _buildCylinderY(faces, const Vector3(10, -28, 0), 4, 6.5, 12,
+    _buildSolidCylinderY(faces, const Vector3(10, -28, 0), 4, 6.5, 14,
         const Color(0xFFEAB308), isMetallic: true);
 
     // Cross Screw Slot (+)
@@ -1138,33 +1144,29 @@ class _Resistor3DPainter extends CustomPainter {
       strokeWidth: 2.0,
     ));
 
-    // 3 Gold-Plated PCB Solder Pins (Bottom)
+    // 3 Gold-Plated PCB Solder Pins (Bottom Solid Cylinders)
     for (int i = -1; i <= 1; i++) {
       final x = i * 13.0;
-      lines.add(Line3D(
-        start: Vector3(x, 22, 0),
-        end: Vector3(x, 44, 0),
-        color: const Color(0xFFFBBF24),
-        strokeWidth: 3.2,
-      ));
+      _buildSolidCylinderY(faces, Vector3(x, 22, 0), 22, 1.6, 8,
+          const Color(0xFFFBBF24), isMetallic: true);
     }
   }
 
   /// 6. LDR (Light Dependent Resistor: forward-facing disc, CdS zigzag track, brass bezel)
   void _buildLDR(List<Face3D> faces, List<Line3D> lines) {
     const radius = 26.0;
-    const segments = 18;
+    const segs = 20;
 
     // Ceramic Base Disc along Z
-    _buildCylinderZ(faces, const Vector3(0, 0, -6), 8, radius, segments,
+    _buildSolidCylinderZ(faces, const Vector3(0, 0, -6), 8, radius, segs,
         const Color(0xFFE2E8F0));
 
     // Golden Bezel Rim
-    _buildCylinderZ(faces, const Vector3(0, 0, 1), 2, radius + 1.2, segments,
+    _buildSolidCylinderZ(faces, const Vector3(0, 0, 1), 2, radius + 1.2, segs,
         const Color(0xFFCA8A04), isMetallic: true);
 
     // Clear Optical Face (Yellow-tinted epoxy)
-    _buildCylinderZ(faces, const Vector3(0, 0, 2), 1, radius - 0.5, segments,
+    _buildSolidCylinderZ(faces, const Vector3(0, 0, 2), 1, radius - 0.5, segs,
         const Color(0xFFFEF08A));
 
     // Serpentine Zigzag CdS Photoconductive Track Pattern
@@ -1184,91 +1186,59 @@ class _Resistor3DPainter extends CustomPainter {
       lines.add(Line3D(
         start: pts[i],
         end: pts[i + 1],
-        color: const Color(0xFFDC2626), // Cadmium Sulfide track
+        color: const Color(0xFFDC2626),
         strokeWidth: 2.8,
       ));
     }
 
-    // 2 Rear Leads
-    lines.add(Line3D(
-      start: const Vector3(-10, 0, -6),
-      end: const Vector3(-10, 0, -48),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.2,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(10, 0, -6),
-      end: const Vector3(10, 0, -48),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.2,
-    ));
+    // 2 Rear Leads (Solid Cylinders)
+    _buildSolidCylinderZ(faces, const Vector3(-10, 0, -46), 40, 1.6, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildSolidCylinderZ(faces, const Vector3(10, 0, -46), 40, 1.6, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
   }
 
   /// 7. Thermistor (Glossy organic ceramic bead with kinked dual leads)
   void _buildThermistor(List<Face3D> faces, List<Line3D> lines) {
     const radius = 20.0;
 
-    // Spheroid Bead Body
-    _buildSphere(faces, const Vector3(0, 0, 0), radius, 10, 14,
+    // Solid Spheroid Bead Body
+    _buildSolidSphere(faces, const Vector3(0, 0, 0), radius, 12, 16,
         const Color(0xFF0D9488), isMetallic: true);
 
-    // Kinked Wire Leads
-    lines.add(Line3D(
-      start: const Vector3(-6, radius - 2, 0),
-      end: const Vector3(-8, radius + 12, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.2,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(-8, radius + 12, 0),
-      end: const Vector3(-10, radius + 44, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.2,
-    ));
+    // Leads (Solid Cylinders with Kink)
+    _buildSolidCylinderY(faces, Vector3(-6, radius - 2, 0), 14, 1.6, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildSolidCylinderY(faces, Vector3(-9, radius + 12, 0), 32, 1.6, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
 
-    lines.add(Line3D(
-      start: const Vector3(6, radius - 2, 0),
-      end: const Vector3(8, radius + 12, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.2,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(8, radius + 12, 0),
-      end: const Vector3(10, radius + 44, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.2,
-    ));
+    _buildSolidCylinderY(faces, Vector3(6, radius - 2, 0), 14, 1.6, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildSolidCylinderY(faces, Vector3(9, radius + 12, 0), 32, 1.6, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
   }
 
   /// 8. Varistor (MOV Radial Disc with Silkscreen markings)
   void _buildVaristor(List<Face3D> faces, List<Line3D> lines) {
     const radius = 28.0;
     const thickness = 8.0;
-    const segments = 18;
+    const segs = 20;
 
     // Disc Body along Z (High-Voltage Blue MOV)
-    _buildCylinderZ(
+    _buildSolidCylinderZ(
       faces,
       const Vector3(0, -6, -thickness / 2),
       thickness,
       radius,
-      segments,
+      segs,
       const Color(0xFF1D4ED8),
     );
 
-    // 2 Radial Leads with crimp
-    lines.add(Line3D(
-      start: const Vector3(-10, radius - 6, 0),
-      end: const Vector3(-12, radius + 42, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.4,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(10, radius - 6, 0),
-      end: const Vector3(12, radius + 42, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.4,
-    ));
+    // 2 Radial Leads (Solid Cylinders)
+    _buildSolidCylinderY(faces, Vector3(-10, radius - 6, 0), 44, 1.8, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildSolidCylinderY(faces, Vector3(10, radius - 6, 0), 44, 1.8, 8,
+        const Color(0xFFCBD5E1), isMetallic: true);
 
     // Stamped markings silkscreen
     lines.add(Line3D(
@@ -1292,7 +1262,7 @@ class _Resistor3DPainter extends CustomPainter {
     const height = 24.0;
 
     // White Ceramic Prism Brick
-    _buildBox(
+    _buildSolidBox(
       faces,
       Vector3(-length / 2, -height / 2, -width / 2),
       const Vector3(length, height, width),
@@ -1313,19 +1283,11 @@ class _Resistor3DPainter extends CustomPainter {
       strokeWidth: 2.2,
     ));
 
-    // Heavy Tinned Leads
-    lines.add(Line3D(
-      start: const Vector3(-length / 2 - 44, 0, 0),
-      end: const Vector3(-length / 2, 0, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 4.5,
-    ));
-    lines.add(Line3D(
-      start: const Vector3(length / 2, 0, 0),
-      end: const Vector3(length / 2 + 44, 0, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 4.5,
-    ));
+    // Heavy Tinned Solid Leads
+    _buildSolidCylinderX(faces, const Vector3(-length / 2 - 44, 0, 0), 44, 2.5, 10,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildSolidCylinderX(faces, Vector3(length / 2, 0, 0), 44, 2.5, 10,
+        const Color(0xFFCBD5E1), isMetallic: true);
   }
 
   /// 10. SMD Resistor (0805 Surface Mount Chip)
@@ -1336,7 +1298,7 @@ class _Resistor3DPainter extends CustomPainter {
     const capWidth = 12.0;
 
     // Black Ceramic Body (Center)
-    _buildBox(
+    _buildSolidBox(
       faces,
       Vector3(-length / 2 + capWidth, -height / 2, -width / 2),
       const Vector3(length - capWidth * 2, height, width),
@@ -1344,14 +1306,14 @@ class _Resistor3DPainter extends CustomPainter {
     );
 
     // Silver Wrap-Around Solder Terminations (Left & Right)
-    _buildBox(
+    _buildSolidBox(
       faces,
       Vector3(-length / 2, -height / 2, -width / 2),
       const Vector3(capWidth, height, width),
       const Color(0xFFE2E8F0),
       isMetallic: true,
     );
-    _buildBox(
+    _buildSolidBox(
       faces,
       Vector3(length / 2 - capWidth, -height / 2, -width / 2),
       const Vector3(capWidth, height, width),
@@ -1381,11 +1343,10 @@ class _Resistor3DPainter extends CustomPainter {
   }
 
   // ===========================================================================
-  // 3D PRIMITIVE HELPERS WITH CONSISTENT OUTWARD WINDING
+  // 100% SOLID WATERTIGHT PRIMITIVE HELPERS
   // ===========================================================================
 
-  /// Cylinder aligned with the X-Axis (length along X, circular cross section in YZ).
-  void _buildCylinderX(
+  void _buildSolidCylinderX(
     List<Face3D> faces,
     Vector3 origin,
     double length,
@@ -1411,9 +1372,14 @@ class _Resistor3DPainter extends CustomPainter {
       final p3 = origin + Vector3(length, y2, z2);
       final p4 = origin + Vector3(length, y1, z1);
 
-      // Outward facing quad
+      // Two triangles per quad for planar accuracy
       faces.add(Face3D(
-        vertices: [p1, p2, p3, p4],
+        vertices: [p1, p2, p3],
+        baseColor: color,
+        isMetallic: isMetallic,
+      ));
+      faces.add(Face3D(
+        vertices: [p1, p3, p4],
         baseColor: color,
         isMetallic: isMetallic,
       ));
@@ -1426,7 +1392,6 @@ class _Resistor3DPainter extends CustomPainter {
     final rightCenter = origin + Vector3(length, 0, 0);
     for (int i = 0; i < segments; i++) {
       final next = (i + 1) % segments;
-      // Caps wound so outward normal points outwards
       faces.add(Face3D(
         vertices: [leftCenter, leftCap[next], leftCap[i]],
         baseColor: color,
@@ -1440,8 +1405,7 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// Cylinder aligned with the Y-Axis (length along Y, circular cross section in XZ).
-  void _buildCylinderY(
+  void _buildSolidCylinderY(
     List<Face3D> faces,
     Vector3 origin,
     double length,
@@ -1468,7 +1432,12 @@ class _Resistor3DPainter extends CustomPainter {
       final p4 = origin + Vector3(x1, length, z1);
 
       faces.add(Face3D(
-        vertices: [p1, p4, p3, p2],
+        vertices: [p1, p4, p3],
+        baseColor: color,
+        isMetallic: isMetallic,
+      ));
+      faces.add(Face3D(
+        vertices: [p1, p3, p2],
         baseColor: color,
         isMetallic: isMetallic,
       ));
@@ -1494,8 +1463,7 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// Cylinder aligned with the Z-Axis (length along Z, circular cross section in XY).
-  void _buildCylinderZ(
+  void _buildSolidCylinderZ(
     List<Face3D> faces,
     Vector3 origin,
     double length,
@@ -1522,7 +1490,12 @@ class _Resistor3DPainter extends CustomPainter {
       final p4 = origin + Vector3(x1, y1, length);
 
       faces.add(Face3D(
-        vertices: [p1, p2, p3, p4],
+        vertices: [p1, p2, p3],
+        baseColor: color,
+        isMetallic: isMetallic,
+      ));
+      faces.add(Face3D(
+        vertices: [p1, p3, p4],
         baseColor: color,
         isMetallic: isMetallic,
       ));
@@ -1548,44 +1521,7 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// Tapered cylinder along the X-Axis (for dogbone flared resistor shoulders).
-  void _buildTaperedCylinderX(
-    List<Face3D> faces,
-    Vector3 origin,
-    double length, {
-    required double radius1,
-    required double radius2,
-    required int segments,
-    required Color color,
-  }) {
-    for (int i = 0; i < segments; i++) {
-      final a1 = (i / segments) * 2 * math.pi;
-      final a2 = ((i + 1) / segments) * 2 * math.pi;
-
-      final y1a = math.cos(a1) * radius1;
-      final z1a = math.sin(a1) * radius1;
-      final y2a = math.cos(a2) * radius1;
-      final z2a = math.sin(a2) * radius1;
-
-      final y1b = math.cos(a1) * radius2;
-      final z1b = math.sin(a1) * radius2;
-      final y2b = math.cos(a2) * radius2;
-      final z2b = math.sin(a2) * radius2;
-
-      final p1 = origin + Vector3(0, y1a, z1a);
-      final p2 = origin + Vector3(0, y2a, z2a);
-      final p3 = origin + Vector3(length, y2b, z2b);
-      final p4 = origin + Vector3(length, y1b, z1b);
-
-      faces.add(Face3D(
-        vertices: [p1, p2, p3, p4],
-        baseColor: color,
-      ));
-    }
-  }
-
-  /// Solid 6-sided cuboid box with consistent outward winding.
-  void _buildBox(
+  void _buildSolidBox(
     List<Face3D> faces,
     Vector3 origin,
     Vector3 size,
@@ -1601,22 +1537,20 @@ class _Resistor3DPainter extends CustomPainter {
     final p111 = origin + size;
     final p011 = origin + Vector3(0, size.y, size.z);
 
-    // Front (+Z)
-    faces.add(Face3D(vertices: [p001, p101, p111, p011], baseColor: color, isMetallic: isMetallic));
-    // Back (-Z)
-    faces.add(Face3D(vertices: [p100, p000, p010, p110], baseColor: color, isMetallic: isMetallic));
-    // Top (-Y)
-    faces.add(Face3D(vertices: [p000, p100, p101, p001], baseColor: color, isMetallic: isMetallic));
-    // Bottom (+Y)
-    faces.add(Face3D(vertices: [p010, p011, p111, p110], baseColor: color, isMetallic: isMetallic));
-    // Left (-X)
-    faces.add(Face3D(vertices: [p000, p001, p011, p010], baseColor: color, isMetallic: isMetallic));
-    // Right (+X)
-    faces.add(Face3D(vertices: [p100, p110, p111, p101], baseColor: color, isMetallic: isMetallic));
+    void addQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) {
+      faces.add(Face3D(vertices: [a, b, c], baseColor: color, isMetallic: isMetallic));
+      faces.add(Face3D(vertices: [a, c, d], baseColor: color, isMetallic: isMetallic));
+    }
+
+    addQuad(p001, p101, p111, p011); // Front
+    addQuad(p100, p000, p010, p110); // Back
+    addQuad(p000, p100, p101, p001); // Top
+    addQuad(p010, p011, p111, p110); // Bottom
+    addQuad(p000, p001, p011, p010); // Left
+    addQuad(p100, p110, p111, p101); // Right
   }
 
-  /// UV-tessellated sphere with outward winding for thermistor ceramic bead.
-  void _buildSphere(
+  void _buildSolidSphere(
     List<Face3D> faces,
     Vector3 center,
     double radius,
@@ -1648,7 +1582,8 @@ class _Resistor3DPainter extends CustomPainter {
         } else if (r == rings - 1) {
           faces.add(Face3D(vertices: [p1, p2, p3], baseColor: color, isMetallic: isMetallic));
         } else {
-          faces.add(Face3D(vertices: [p1, p2, p3, p4], baseColor: color, isMetallic: isMetallic));
+          faces.add(Face3D(vertices: [p1, p2, p3], baseColor: color, isMetallic: isMetallic));
+          faces.add(Face3D(vertices: [p1, p3, p4], baseColor: color, isMetallic: isMetallic));
         }
       }
     }
@@ -1660,6 +1595,15 @@ class _Resistor3DPainter extends CustomPainter {
       oldDelegate.pitch != pitch ||
       oldDelegate.zoom != zoom ||
       oldDelegate.type != type;
+}
+
+class _LatheSlice {
+  final double x;
+  final double radius;
+  final Color color;
+  final bool isMetallic;
+
+  _LatheSlice(this.x, this.radius, this.color, {this.isMetallic = false});
 }
 
 class _Renderable {
@@ -1737,7 +1681,7 @@ String _getResistorName(Resistor3DType type) {
 String _getResistorCallout(Resistor3DType type) {
   switch (type) {
     case Resistor3DType.carbonComposition:
-      return 'Contoured flared ceramic body, tinned axial copper leads, and 4-band color coding.';
+      return 'Solid contoured ceramic body, tinned axial copper leads, and 4-band color coding.';
     case Resistor3DType.carbonFilm:
       return 'Precision pure carbon film with a visible helical laser-cut groove to calibrate resistance.';
     case Resistor3DType.metalFilm:
