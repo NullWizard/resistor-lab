@@ -1,123 +1,234 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Futuristic background with animated/ambient chromatic glowing energy orbs
-/// and subtle holographic technical grid lines, isolated with RepaintBoundary
-/// for 60/120 FPS rendering.
-class FuturisticBackground extends StatelessWidget {
+/// Futuristic animated liquid glass background with smoothly orbiting chromatic
+/// plasma orbs and ascending translucent glass micro-bubbles.
+///
+/// Pinned strictly to the screen viewport via a root [Stack] so that it remains
+/// static in screen space while the foreground content scrolls smoothly over it.
+class FuturisticBackground extends StatefulWidget {
   final Widget child;
 
   const FuturisticBackground({super.key, required this.child});
 
   @override
+  State<FuturisticBackground> createState() => _FuturisticBackgroundState();
+}
+
+class _FuturisticBackgroundState extends State<FuturisticBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 22),
+    );
+    // Avoid scheduling infinite animation frames in widget tests which would cause pumpAndSettle to time out
+    final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (!isTest) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Stack(
-        children: [
-          // 1. Deep Space Obsidian Canvas
-          Container(
-            color: const Color(0xFF030712),
-          ),
-
-          // 2. Top-Left Vibrant Cyan Aurora Energy Orb
-          Positioned(
-            top: -120,
-            left: -100,
-            child: Container(
-              width: 420,
-              height: 420,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                    const Color(0xFF00E5FF).withValues(alpha: 0.08),
-                    const Color(0xFF00E5FF).withValues(alpha: 0.0),
-                  ],
-                  stops: const [0.0, 0.45, 1.0],
-                ),
+    return Stack(
+      children: [
+        // 1. Viewport-Pinned Static Animated Canvas
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) => CustomPaint(
+                painter: _AnimatedLiquidPlasmaPainter(_controller.value),
               ),
             ),
           ),
+        ),
 
-          // 3. Right-Center Vibrant Violet Plasma Orb
-          Positioned(
-            top: 260,
-            right: -120,
-            child: Container(
-              width: 440,
-              height: 440,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFFA855F7).withValues(alpha: 0.22),
-                    const Color(0xFFA855F7).withValues(alpha: 0.06),
-                    const Color(0xFFA855F7).withValues(alpha: 0.0),
-                  ],
-                  stops: const [0.0, 0.50, 1.0],
-                ),
+        // 2. Technical Holographic Circuit Matrix Points
+        Positioned.fill(
+          child: IgnorePointer(
+            child: const RepaintBoundary(
+              child: CustomPaint(
+                painter: _TechGridPainter(),
               ),
             ),
           ),
+        ),
 
-          // 4. Center-Left Ambient Teal Glow
-          Positioned(
-            top: 600,
-            left: -80,
-            child: Container(
-              width: 360,
-              height: 360,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF14B8A6).withValues(alpha: 0.16),
-                    const Color(0xFF14B8A6).withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 5. Bottom-Right Ambient Sapphire Glow
-          Positioned(
-            bottom: -100,
-            right: 20,
-            child: Container(
-              width: 380,
-              height: 380,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF3B82F6).withValues(alpha: 0.20),
-                    const Color(0xFF3B82F6).withValues(alpha: 0.0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 6. Subtle Technical Grid Pattern (cached in RepaintBoundary)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: const RepaintBoundary(
-                child: CustomPaint(
-                  painter: _TechGridPainter(),
-                ),
-              ),
-            ),
-          ),
-
-          // 7. Child Content
-          child,
-        ],
-      ),
+        // 3. Scrollable Foreground Content
+        Positioned.fill(
+          child: widget.child,
+        ),
+      ],
     );
   }
+}
+
+/// Smooth 60 FPS painter for drifting chromatic plasma orbs and ascending glass micro-bubbles.
+class _AnimatedLiquidPlasmaPainter extends CustomPainter {
+  final double progress;
+
+  _AnimatedLiquidPlasmaPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Deep Space Obsidian Canvas
+    final bgPaint = Paint()..color = const Color(0xFF030712);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    final t = progress * 2.0 * math.pi;
+
+    // 2. Drifting Chromatic Plasma Orbs
+    // Orb A: Electric Cyber Cyan (Top-Left drifting)
+    final orbAx = size.width * 0.15 + math.sin(t) * 60;
+    final orbAy = size.height * 0.12 + math.cos(t * 0.8) * 45;
+    final orbAr = 240.0 + math.sin(t * 1.2) * 35;
+    _drawPlasmaOrb(
+      canvas,
+      Offset(orbAx, orbAy),
+      orbAr,
+      const Color(0xFF00E5FF),
+      alphaPeak: 0.24,
+    );
+
+    // Orb B: Radiant Ultraviolet (Right-Center drifting)
+    final orbBx = size.width * 0.88 + math.cos(t * 0.9) * 55;
+    final orbBy = size.height * 0.42 + math.sin(t * 1.1) * 65;
+    final orbBr = 260.0 + math.cos(t) * 40;
+    _drawPlasmaOrb(
+      canvas,
+      Offset(orbBx, orbBy),
+      orbBr,
+      const Color(0xFFA855F7),
+      alphaPeak: 0.22,
+    );
+
+    // Orb C: Electric Bioluminescent Teal (Left-Lower drifting)
+    final orbCx = size.width * 0.12 + math.cos(t * 0.7) * 45;
+    final orbCy = size.height * 0.72 + math.sin(t * 0.9) * 55;
+    final orbCr = 220.0 + math.sin(t * 0.8) * 30;
+    _drawPlasmaOrb(
+      canvas,
+      Offset(orbCx, orbCy),
+      orbCr,
+      const Color(0xFF14B8A6),
+      alphaPeak: 0.18,
+    );
+
+    // Orb D: Deep Azure Sapphire (Bottom-Right drifting)
+    final orbDx = size.width * 0.82 + math.sin(t * 1.3) * 50;
+    final orbDy = size.height * 0.88 + math.cos(t * 0.7) * 45;
+    final orbDr = 250.0 + math.sin(t * 0.9) * 35;
+    _drawPlasmaOrb(
+      canvas,
+      Offset(orbDx, orbDy),
+      orbDr,
+      const Color(0xFF3B82F6),
+      alphaPeak: 0.20,
+    );
+
+    // Orb E: Hot Plasma Magenta (Subtle Center Floating)
+    final orbEx = size.width * 0.50 + math.sin(t * 0.6) * 40;
+    final orbEy = size.height * 0.55 + math.cos(t * 0.8) * 50;
+    final orbEr = 200.0 + math.cos(t * 1.4) * 25;
+    _drawPlasmaOrb(
+      canvas,
+      Offset(orbEx, orbEy),
+      orbEr,
+      const Color(0xFFEC4899),
+      alphaPeak: 0.12,
+    );
+
+    // 3. Ascending Translucent Glass Micro-Bubbles
+    _drawGlassBubbles(canvas, size, progress);
+  }
+
+  void _drawPlasmaOrb(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color color, {
+    required double alphaPeak,
+  }) {
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          color.withValues(alpha: alphaPeak),
+          color.withValues(alpha: alphaPeak * 0.45),
+          color.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.48, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+    canvas.drawCircle(center, radius, paint);
+  }
+
+  void _drawGlassBubbles(Canvas canvas, Size size, double progress) {
+    const bubbleCount = 14;
+    for (int i = 0; i < bubbleCount; i++) {
+      final seedX = ((i * 37 + 11) % 100) / 100.0;
+      final speed = 0.4 + ((i * 19 + 7) % 10) / 15.0;
+      final bubbleRadius = 5.0 + ((i * 29 + 13) % 11).toDouble();
+
+      final yProgress = (progress * speed + (i / bubbleCount)) % 1.0;
+      final y = size.height * (1.0 - yProgress);
+
+      final sway = math.sin((progress * 2.0 * math.pi) + (i * 1.5)) * 18.0;
+      final x = (size.width * seedX + sway).clamp(bubbleRadius * 2, size.width - bubbleRadius * 2);
+
+      final center = Offset(x, y);
+
+      final bubbleFill = Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.35, -0.35),
+          colors: [
+            Colors.white.withValues(alpha: 0.15),
+            const Color(0xFF00E5FF).withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+          stops: const [0.0, 0.6, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: bubbleRadius));
+      canvas.drawCircle(center, bubbleRadius, bubbleFill);
+
+      final rimPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.45),
+            Colors.white.withValues(alpha: 0.10),
+            const Color(0xFF00E5FF).withValues(alpha: 0.30),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: bubbleRadius));
+      canvas.drawCircle(center, bubbleRadius, rimPaint);
+
+      final gleamCenter = center + Offset(-bubbleRadius * 0.35, -bubbleRadius * 0.35);
+      final gleamPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.65)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(gleamCenter, bubbleRadius * 0.22, gleamPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnimatedLiquidPlasmaPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 /// Custom painter for subtle holographic technical grid points.
@@ -142,15 +253,7 @@ class _TechGridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Apple visionOS & Liquid Glass inspired High-Visibility Translucent Container.
-///
-/// Ref: https://liquidglassdesign.com/
-/// Features:
-/// - Optical surface luminance simulation with top-to-bottom specular wash
-/// - Luminous beveled specular rim highlight (catching light on top-left edge)
-/// - Inner lens thickness bevel stroke
-/// - Zero-lag RepaintBoundary raster caching
-/// - Hardware backdrop blur on native platforms, hardware-efficient shader gradient on web
+/// Apple visionOS & Liquid Glass inspired Bubbly Translucent Glass Container.
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double borderRadius;
@@ -165,20 +268,20 @@ class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
     required this.child,
-    this.borderRadius = 22.0,
+    this.borderRadius = 28.0,
     this.padding,
     this.margin,
     this.tintColor,
     this.glowColor,
-    this.blurSigma = 9.0,
-    this.borderWidth = 1.4,
+    this.blurSigma = 14.0,
+    this.borderWidth = 1.3,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final effectiveTint =
-        tintColor ?? const Color(0xFF0C1322).withValues(alpha: 0.72);
+        tintColor ?? const Color(0xFF0B1322).withValues(alpha: 0.70);
 
     Widget content = Container(
       padding: padding ?? const EdgeInsets.all(20.0),
@@ -189,12 +292,12 @@ class GlassContainer extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.16),
-            Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.20),
+            Colors.white.withValues(alpha: 0.07),
             Colors.white.withValues(alpha: 0.02),
-            (glowColor ?? Colors.white).withValues(alpha: 0.06),
+            (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.08),
           ],
-          stops: const [0.0, 0.20, 0.65, 1.0],
+          stops: const [0.0, 0.25, 0.70, 1.0],
         ),
       ),
       child: child,
@@ -206,8 +309,8 @@ class GlassContainer extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(borderRadius),
-          splashColor: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.18),
-          highlightColor: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.08),
+          splashColor: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.20),
+          highlightColor: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.10),
           child: content,
         ),
       );
@@ -219,27 +322,24 @@ class GlassContainer extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
-            // Deep ambient occlusion shadow
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.52),
-              blurRadius: 22,
+              color: Colors.black.withValues(alpha: 0.55),
+              blurRadius: 28,
               offset: const Offset(0, 10),
             ),
-            // Chromatic ambient bloom
-            if (glowColor != null)
-              BoxShadow(
-                color: glowColor!.withValues(alpha: 0.22),
-                blurRadius: 26,
-                spreadRadius: -3,
-                offset: const Offset(0, 4),
-              ),
+            BoxShadow(
+              color: (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.22),
+              blurRadius: 32,
+              spreadRadius: -2,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(borderRadius),
           child: kIsWeb
               ? CustomPaint(
-                  foregroundPainter: _LiquidGlassBorderPainter(
+                  foregroundPainter: _BubblyGlassBorderPainter(
                     borderRadius: borderRadius,
                     borderWidth: borderWidth,
                     glowColor: glowColor,
@@ -249,7 +349,7 @@ class GlassContainer extends StatelessWidget {
               : BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
                   child: CustomPaint(
-                    foregroundPainter: _LiquidGlassBorderPainter(
+                    foregroundPainter: _BubblyGlassBorderPainter(
                       borderRadius: borderRadius,
                       borderWidth: borderWidth,
                       glowColor: glowColor,
@@ -263,14 +363,13 @@ class GlassContainer extends StatelessWidget {
   }
 }
 
-/// Custom painter for the beveled Liquid Glass specular border highlight.
-/// Renders an outer specular catch and a subtle inner refractive edge.
-class _LiquidGlassBorderPainter extends CustomPainter {
+/// Custom painter for the authentic Bubbly Liquid Glass specular highlight & meniscus sheen.
+class _BubblyGlassBorderPainter extends CustomPainter {
   final double borderRadius;
   final double borderWidth;
   final Color? glowColor;
 
-  const _LiquidGlassBorderPainter({
+  const _BubblyGlassBorderPainter({
     required this.borderRadius,
     required this.borderWidth,
     this.glowColor,
@@ -281,7 +380,7 @@ class _LiquidGlassBorderPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
 
-    // 1. Primary Outer Specular Border (light catching top-left shoulder)
+    // 1. Primary Outer Specular Rim (intense 45° shoulder catch)
     final primaryPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = borderWidth
@@ -289,16 +388,12 @@ class _LiquidGlassBorderPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          glowColor != null
-              ? glowColor!.withValues(alpha: 0.88)
-              : Colors.white.withValues(alpha: 0.85),
-          Colors.white.withValues(alpha: 0.30),
-          Colors.white.withValues(alpha: 0.08),
-          glowColor != null
-              ? glowColor!.withValues(alpha: 0.35)
-              : Colors.white.withValues(alpha: 0.18),
+          Colors.white.withValues(alpha: 0.92),
+          (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.70),
+          Colors.white.withValues(alpha: 0.12),
+          (glowColor ?? const Color(0xFF00E5FF)).withValues(alpha: 0.35),
         ],
-        stops: const [0.0, 0.22, 0.65, 1.0],
+        stops: const [0.0, 0.24, 0.65, 1.0],
       ).createShader(rect);
 
     canvas.drawRRect(rrect, primaryPaint);
@@ -317,25 +412,57 @@ class _LiquidGlassBorderPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: 0.22),
+            Colors.white.withValues(alpha: 0.30),
             Colors.white.withValues(alpha: 0.0),
           ],
-          stops: const [0.0, 0.35],
+          stops: const [0.0, 0.40],
         ).createShader(innerRect);
 
       canvas.drawRRect(innerRRect, innerPaint);
     }
+
+    // 3. Convex Specular Meniscus Glare (curved bubble sheen on top shoulder)
+    if (size.width > 40 && size.height > 40) {
+      final meniscusHeight = math.min(size.height * 0.40, 36.0);
+      final meniscusRect = Rect.fromLTWH(
+        borderWidth,
+        borderWidth,
+        size.width - borderWidth * 2,
+        meniscusHeight,
+      );
+      final meniscusRRect = RRect.fromRectAndCorners(
+        meniscusRect,
+        topLeft: Radius.circular(borderRadius - borderWidth),
+        topRight: Radius.circular(borderRadius - borderWidth),
+        bottomLeft: const Radius.circular(16),
+        bottomRight: const Radius.circular(16),
+      );
+
+      final meniscusPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.22),
+            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(meniscusRect);
+
+      canvas.drawRRect(meniscusRRect, meniscusPaint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _LiquidGlassBorderPainter oldDelegate) =>
+  bool shouldRepaint(covariant _BubblyGlassBorderPainter oldDelegate) =>
       oldDelegate.borderRadius != borderRadius ||
       oldDelegate.borderWidth != borderWidth ||
       oldDelegate.glowColor != glowColor;
 }
 
 /// VisionOS & Liquid Glass style Rounded Capsule Pill.
-/// Ref: https://liquidglassdesign.com/
 class GlassBadge extends StatelessWidget {
   final String label;
   final IconData? icon;
@@ -353,21 +480,29 @@ class GlassBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5.5),
       decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.14),
+        color: accentColor.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: accentColor.withValues(alpha: 0.45),
-          width: 1.1,
+          color: accentColor.withValues(alpha: 0.50),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withValues(alpha: 0.18),
-            blurRadius: 10,
+            color: accentColor.withValues(alpha: 0.25),
+            blurRadius: 12,
             spreadRadius: -2,
           ),
         ],
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.22),
+            Colors.white.withValues(alpha: 0.02),
+          ],
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -377,15 +512,15 @@ class GlassBadge extends StatelessWidget {
             const SizedBox(width: 5),
           ] else ...[
             Container(
-              width: 5.5,
-              height: 5.5,
+              width: 6.0,
+              height: 6.0,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: accentColor,
                 boxShadow: [
                   BoxShadow(
                     color: accentColor.withValues(alpha: 0.9),
-                    blurRadius: 5,
+                    blurRadius: 6,
                   ),
                 ],
               ),
@@ -407,7 +542,7 @@ class GlassBadge extends StatelessWidget {
   }
 }
 
-/// Floating circular liquid glass icon lens with specular border and ambient glow.
+/// Floating circular liquid glass bubble icon lens with specular border and ambient glow.
 class LiquidGlassIconLens extends StatelessWidget {
   final IconData icon;
   final Color accentColor;
@@ -418,8 +553,8 @@ class LiquidGlassIconLens extends StatelessWidget {
     super.key,
     required this.icon,
     this.accentColor = const Color(0xFF00E5FF),
-    this.size = 46.0,
-    this.iconSize = 22.0,
+    this.size = 48.0,
+    this.iconSize = 23.0,
   });
 
   @override
@@ -429,32 +564,32 @@ class LiquidGlassIconLens extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF0B1220).withValues(alpha: 0.80),
+        color: const Color(0xFF0B1322).withValues(alpha: 0.82),
         border: Border.all(
-          color: accentColor.withValues(alpha: 0.50),
+          color: accentColor.withValues(alpha: 0.55),
           width: 1.4,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withValues(alpha: 0.28),
-            blurRadius: 16,
+            color: accentColor.withValues(alpha: 0.32),
+            blurRadius: 18,
             spreadRadius: -2,
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.50),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.24),
-            accentColor.withValues(alpha: 0.16),
-            const Color(0xFF070C16).withValues(alpha: 0.70),
+            Colors.white.withValues(alpha: 0.30),
+            accentColor.withValues(alpha: 0.20),
+            const Color(0xFF070C16).withValues(alpha: 0.75),
           ],
-          stops: const [0.0, 0.35, 1.0],
+          stops: const [0.0, 0.38, 1.0],
         ),
       ),
       child: Center(
@@ -492,7 +627,7 @@ class CircuitTraceDivider extends StatelessWidget {
                 gradient: LinearGradient(
                   colors: [
                     accentColor.withValues(alpha: 0.0),
-                    accentColor.withValues(alpha: 0.35),
+                    accentColor.withValues(alpha: 0.40),
                   ],
                 ),
               ),
@@ -504,11 +639,11 @@ class CircuitTraceDivider extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 8),
             transform: Matrix4.rotationZ(0.785398), // 45 degree diamond
             decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.75),
+              color: accentColor.withValues(alpha: 0.85),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: 0.85),
-                  blurRadius: 6,
+                  color: accentColor.withValues(alpha: 0.90),
+                  blurRadius: 7,
                 ),
               ],
             ),
@@ -519,7 +654,7 @@ class CircuitTraceDivider extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    accentColor.withValues(alpha: 0.35),
+                    accentColor.withValues(alpha: 0.40),
                     accentColor.withValues(alpha: 0.0),
                   ],
                 ),
@@ -532,7 +667,7 @@ class CircuitTraceDivider extends StatelessWidget {
   }
 }
 
-/// High-visibility rounded liquid glass topic container for educational modules.
+/// High-visibility rounded bubbly liquid glass topic container for educational modules.
 class LiquidGlassTopicCard extends StatelessWidget {
   final String title;
   final String? topicNumber;
@@ -554,9 +689,9 @@ class LiquidGlassTopicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassContainer(
-      borderRadius: 24,
+      borderRadius: 28,
       glowColor: accentColor,
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(22.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -568,8 +703,8 @@ class LiquidGlassTopicCard extends StatelessWidget {
               LiquidGlassIconLens(
                 icon: icon,
                 accentColor: accentColor,
-                size: 46,
-                iconSize: 22,
+                size: 48,
+                iconSize: 23,
               ),
               const SizedBox(width: 14),
 
@@ -589,7 +724,7 @@ class LiquidGlassTopicCard extends StatelessWidget {
                     Text(
                       title,
                       style: GoogleFonts.spaceGrotesk(
-                        fontSize: 17.5,
+                        fontSize: 18.0,
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFFF8FAFC),
                         letterSpacing: -0.2,
@@ -639,12 +774,12 @@ class GlassButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassContainer(
       onTap: onPressed,
-      borderRadius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      borderRadius: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
       glowColor: isPrimary ? accentColor : null,
       tintColor: isPrimary
-          ? accentColor.withValues(alpha: 0.25)
-          : const Color(0xFF0F172A).withValues(alpha: 0.65),
+          ? accentColor.withValues(alpha: 0.28)
+          : const Color(0xFF0F172A).withValues(alpha: 0.70),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -671,4 +806,3 @@ class GlassButton extends StatelessWidget {
     );
   }
 }
-
