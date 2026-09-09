@@ -39,11 +39,11 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
     super.initState();
     // Continuous phase synchronization using wall-clock time
     final ms = DateTime.now().millisecondsSinceEpoch;
-    final initialProgress = (ms % 10000) / 10000.0;
+    final initialProgress = (ms % 18000) / 18000.0;
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: const Duration(seconds: 18),
       value: initialProgress,
     );
 
@@ -139,7 +139,7 @@ class _StaticAmbientBackgroundPainter extends CustomPainter {
           ],
           stops: const [0.0, 0.38, 0.68, 1.0],
         ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60.64);
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 66.70);
       canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
     }
 
@@ -229,15 +229,22 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       path.close();
 
       if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
-        // High-performance hardware-accelerated dual-pass glow for WebGL / CanvasKit.
-        // 1. Soft glowing neon halo
+        // High-performance hardware-accelerated multi-pass glow for WebGL / Android.
+        // 1. Soft diffused outer glow aura (10% more diffused blur)
+        final softHaloPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 22.0 + 11.0 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.16);
+        canvas.drawPath(path, softHaloPaint);
+
+        // 2. Focused glowing neon halo
         final haloPaint = Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 8.0 + 4.0 * ringProgress
-          ..color = color.withValues(alpha: alpha * 0.40);
+          ..strokeWidth = 9.0 + 4.5 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.38);
         canvas.drawPath(path, haloPaint);
 
-        // 2. Bright delicate harmonic core line
+        // 3. Bright delicate harmonic core line
         final coreLinePaint = Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.2
@@ -245,10 +252,10 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
         canvas.drawPath(path, coreLinePaint);
       } else {
         // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow on Native Mobile (Metal / Vulkan / Impeller)
-        final blurAmount = (38.0 + 20.0 * ringProgress) * 1.1025;
+        final blurAmount = (38.0 + 20.0 * ringProgress) * 1.2127;
         final waveStrokePaint = Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 22.0 + 14.0 * ringProgress
+          ..strokeWidth = 24.0 + 15.0 * ringProgress
           ..color = color.withValues(alpha: alpha * 0.80)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurAmount);
 
@@ -257,9 +264,9 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
         // Vivid chromatic inner glow
         final midGlowPaint = Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 6.0 + 4.0 * ringProgress
+          ..strokeWidth = 6.6 + 4.4 * ringProgress
           ..color = color.withValues(alpha: alpha * 0.90)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11.0);
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12.1);
 
         canvas.drawPath(path, midGlowPaint);
 
