@@ -67,7 +67,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Lab Modules',
+                        'Interactive Features',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.3,
@@ -84,7 +84,6 @@ class HomeScreen extends StatelessWidget {
 
                       final card1 = _buildModuleCard(
                         context,
-                        moduleNumber: 'Module 01',
                         title: 'Learn About Resistors',
                         description:
                             "Understand resistor fundamentals, Ohm's law, tolerance and measurement.",
@@ -103,7 +102,6 @@ class HomeScreen extends StatelessWidget {
 
                       final card2 = _buildModuleCard(
                         context,
-                        moduleNumber: 'Module 02',
                         title: 'Resistor Color Code',
                         description:
                             'Calculate resistance and tolerance using resistor color bands.',
@@ -122,7 +120,6 @@ class HomeScreen extends StatelessWidget {
 
                       final card3 = _buildModuleCard(
                         context,
-                        moduleNumber: 'Module 03',
                         title: 'Types of Resistors',
                         description:
                             'Explore fixed, variable and special-purpose resistors.',
@@ -141,7 +138,6 @@ class HomeScreen extends StatelessWidget {
 
                       final card4 = _buildModuleCard(
                         context,
-                        moduleNumber: 'Module 04',
                         title: 'Quiz',
                         description:
                             'Test your Basic Electronics knowledge with 10 questions.',
@@ -160,7 +156,6 @@ class HomeScreen extends StatelessWidget {
 
                       final card5 = _buildModuleCard(
                         context,
-                        moduleNumber: 'Module 05',
                         title: 'Scan Resistor',
                         description:
                             'Use your camera to identify resistor color bands.',
@@ -243,59 +238,17 @@ class HomeScreen extends StatelessWidget {
 
     return GlassContainer(
       borderRadius: 26,
-      glowColor: const Color(0xFF00E5FF),
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const GlassBadge(
+              GlassBadge(
                 label: 'BASIC ELECTRONICS LAB',
                 icon: Icons.school_rounded,
                 accentColor: Color(0xFF00E5FF),
                 fontSize: 11,
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.40),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF10B981),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0xFF10B981),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    const Text(
-                      'ACTIVE',
-                      style: TextStyle(
-                        color: Color(0xFF10B981),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
@@ -365,7 +318,6 @@ class HomeScreen extends StatelessWidget {
 
     return GlassContainer(
       borderRadius: 24,
-      glowColor: const Color(0xFF10B981),
       padding: const EdgeInsets.all(20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,10 +403,9 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  /// Reusable Card for the educational modules.
+  /// Reusable Card for the interactive features.
   Widget _buildModuleCard(
     BuildContext context, {
-    required String moduleNumber,
     required String title,
     required String description,
     required IconData icon,
@@ -467,7 +418,6 @@ class HomeScreen extends StatelessWidget {
     return GlassContainer(
       onTap: onTap,
       borderRadius: 22,
-      glowColor: accentColor,
       padding: const EdgeInsets.all(18.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -486,15 +436,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Module Capsule Tag
-                GlassBadge(
-                  label: moduleNumber,
-                  accentColor: accentColor,
-                  fontSize: 10.0,
-                ),
-                const SizedBox(height: 6),
-
-                // Module Title
+                // Feature Title
                 Text(
                   title,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -503,7 +445,7 @@ class HomeScreen extends StatelessWidget {
                     fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
 
                 // Module Description
                 Text(

@@ -965,9 +965,57 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// 2. Wire Wound Resistor with visible metallic Nichrome coils
+  /// Solid 3D metallic helical wire coils wrapped around an X-axis cylinder
+  void _build3DWireCoilX(
+    List<Face3D> faces, {
+    required double startX,
+    required double length,
+    required double coreRadius,
+    required double wireThickness,
+    required int turns,
+    required int segsPerTurn,
+    required Color wireColor,
+    bool isMetallic = true,
+  }) {
+    final totalSteps = turns * segsPerTurn;
+    final pitch = length / turns;
+    final rOut = coreRadius + wireThickness;
+
+    for (int step = 0; step < totalSteps; step++) {
+      final t1 = step / totalSteps;
+      final t2 = (step + 1) / totalSteps;
+      final x1 = startX + t1 * length;
+      final x2 = startX + t2 * length;
+
+      final a1 = (step % segsPerTurn) / segsPerTurn * 2.0 * math.pi;
+      final a2 = ((step + 1) % segsPerTurn) / segsPerTurn * 2.0 * math.pi;
+
+      final o1 = Vector3(x1, math.cos(a1) * rOut, math.sin(a1) * rOut);
+      final o2 = Vector3(x2, math.cos(a2) * rOut, math.sin(a2) * rOut);
+      final halfW = pitch * 0.38;
+
+      final v0 = Vector3(o1.x - halfW, o1.y, o1.z);
+      final v1 = Vector3(o1.x + halfW, o1.y, o1.z);
+      final v2 = Vector3(o2.x + halfW, o2.y, o2.z);
+      final v3 = Vector3(o2.x - halfW, o2.y, o2.z);
+
+      // Verified counterclockwise outward normal for correct specular reflection
+      faces.add(Face3D(
+        vertices: [v0, v3, v2],
+        baseColor: wireColor,
+        isMetallic: isMetallic,
+      ));
+      faces.add(Face3D(
+        vertices: [v0, v2, v1],
+        baseColor: wireColor,
+        isMetallic: isMetallic,
+      ));
+    }
+  }
+
+  /// 2. Wire Wound Resistor (100% Solid 3D ceramic core, 3D metallic Nichrome coils, crimp collars)
   void _buildWireWoundResistor(List<Face3D> faces, List<Line3D> lines) {
-    const radius = 17.0;
+    const radius = 16.0;
     const length = 84.0;
     const segs = 18;
 
@@ -981,27 +1029,28 @@ class _Resistor3DPainter extends CustomPainter {
     _buildSolidCylinderX(faces, Vector3(-length / 2, 0, 0), length, radius, segs,
         const Color(0xFFF8FAFC));
 
-    // Vitreous protective enamel collars (Dark Green)
-    _buildSolidCylinderX(faces, Vector3(-length / 2, 0, 0), 14, radius + 1.2, segs,
-        const Color(0xFF15803D), isMetallic: true);
-    _buildSolidCylinderX(faces, Vector3(length / 2 - 14, 0, 0), 14, radius + 1.2, segs,
-        const Color(0xFF15803D), isMetallic: true);
+    // Stamped Metallic Crimp Band Collars (Clamping resistance wire at ends)
+    _buildSolidCylinderX(faces, Vector3(-length / 2, 0, 0), 12, radius + 1.2, segs,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildSolidCylinderX(faces, Vector3(length / 2 - 12, 0, 0), 12, radius + 1.2, segs,
+        const Color(0xFFCBD5E1), isMetallic: true);
 
-    // Realistic Coiled Wire Windings (Nichrome Wire)
-    const coils = 16;
-    for (int i = 0; i < coils; i++) {
-      final x = -length / 2 + 16 + i * ((length - 32) / coils);
-      for (int s = 0; s < segs; s++) {
-        final a1 = (s / segs) * 2 * math.pi;
-        final a2 = ((s + 1) / segs) * 2 * math.pi;
-        lines.add(Line3D(
-          start: Vector3(x, math.cos(a1) * (radius + 1.0), math.sin(a1) * (radius + 1.0)),
-          end: Vector3(x + 1.2, math.cos(a2) * (radius + 1.0), math.sin(a2) * (radius + 1.0)),
-          color: const Color(0xFFD97706),
-          strokeWidth: 2.2,
-        ));
-      }
-    }
+    // Solid 3D Metallic Nichrome Wire Coils (Gleaming copper/amber alloy turns)
+    _build3DWireCoilX(
+      faces,
+      startX: -length / 2 + 13,
+      length: length - 26,
+      coreRadius: radius,
+      wireThickness: 1.4,
+      turns: 20,
+      segsPerTurn: 16,
+      wireColor: const Color(0xFFEA580C),
+      isMetallic: true,
+    );
+
+    // Semi-translucent protective Vitreous Enamel Glaze (Center green band letting coils gleam)
+    _buildSolidCylinderX(faces, const Vector3(-16, 0, 0), 32, radius + 1.5, segs,
+        const Color(0xFF047857).withValues(alpha: 0.85), isMetallic: true);
   }
 
   /// 3. Potentiometer (Solid cylindrical metal can, brass bushing, hex nut, shaft, lugs)
@@ -1078,46 +1127,128 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// 4. Rheostat (Porcelain winding tube, wire coil, top chrome rail, slider wiper, binding posts)
+  /// 4. Rheostat (Porcelain winding tube, dense 3D metallic wire turns, brush contact track, slider carriage, cast A-frames, knurled terminals)
   void _buildRheostat(List<Face3D> faces, List<Line3D> lines) {
-    const length = 88.0;
+    const length = 94.0;
     const radius = 18.0;
+    const segs = 20;
 
-    // Ceramic Coil Tube
-    _buildSolidCylinderX(faces, Vector3(-length / 2, 6, 0), length, radius, 18,
+    // 1. Hollow Glazed Ceramic Porcelain Coil Tube
+    _buildSolidCylinderX(faces, Vector3(-length / 2, 6, 0), length, radius, segs,
         const Color(0xFFF1F5F9));
 
-    // Wire winding coils
-    for (double x = -length / 2 + 6; x < length / 2 - 6; x += 3.2) {
-      for (int s = 0; s < 12; s++) {
-        final a1 = (s / 12) * 2 * math.pi;
-        final a2 = ((s + 1) / 12) * 2 * math.pi;
-        lines.add(Line3D(
-          start: Vector3(x, 6 + math.cos(a1) * (radius + 0.8), math.sin(a1) * (radius + 0.8)),
-          end: Vector3(x, 6 + math.cos(a2) * (radius + 0.8), math.sin(a2) * (radius + 0.8)),
-          color: const Color(0xFFB45309),
-          strokeWidth: 1.8,
-        ));
-      }
+    // 2. Dense Solid 3D Metallic Resistance Wire Winding (30 turns of Nichrome bronze wire)
+    _build3DWireCoilX(
+      faces,
+      startX: -length / 2 + 7,
+      length: length - 14,
+      coreRadius: radius,
+      wireThickness: 1.3,
+      turns: 30,
+      segsPerTurn: 16,
+      wireColor: const Color(0xFFD97706),
+      isMetallic: true,
+    );
+
+    // 3. Exposed Top Brushed Silver Contact Track (where insulation is ground for slider brush)
+    _buildSolidBox(
+      faces,
+      Vector3(-length / 2 + 7, 6 - radius - 1.4, -3.5),
+      Vector3(length - 14, 0.9, 7.0),
+      const Color(0xFFE2E8F0),
+      isMetallic: true,
+    );
+
+    // 4. Sturdy Cast Metal End A-Frames (Left & Right support brackets with base feet)
+    for (final isLeft in [true, false]) {
+      final x = isLeft ? -length / 2 - 4.0 : length / 2;
+      // Vertical end plate holding tube
+      _buildSolidBox(
+        faces,
+        Vector3(x, -22, -12),
+        const Vector3(4.0, 48.0, 24.0),
+        const Color(0xFF334155),
+        isMetallic: true,
+      );
+      // Stable horizontal base foot
+      _buildSolidBox(
+        faces,
+        Vector3(x - 2.0, 24, -18),
+        const Vector3(8.0, 5.0, 36.0),
+        const Color(0xFF1E293B),
+        isMetallic: true,
+      );
     }
 
-    // Top Chrome Slider Guide Rod (Solid Cylinder)
-    _buildSolidCylinderX(faces, const Vector3(-length / 2 - 10, -20, 0), length + 20, 2.5, 10,
-        const Color(0xFFCBD5E1), isMetallic: true);
+    // 5. Solid Hexagonal / Cylindrical Top Chrome Slider Guide Rod
+    _buildSolidCylinderX(
+      faces,
+      Vector3(-length / 2 - 8, -18, 0),
+      length + 16,
+      2.6,
+      12,
+      const Color(0xFFCBD5E1),
+      isMetallic: true,
+    );
 
-    // Wiper Slider Carriage Block (Cyan / Blue)
-    _buildSolidBox(faces, const Vector3(-8, -26, -8), const Vector3(16, 12, 16),
-        const Color(0xFF0284C7), isMetallic: true);
+    // 6. Detailed Slider Wiper Carriage (Positioned near center x = -6)
+    const wiperX = -6.0;
+    // Wiper carriage body (Phenolic insulated block)
+    _buildSolidBox(
+      faces,
+      const Vector3(wiperX - 9, -24, -10),
+      const Vector3(18, 12, 20),
+      const Color(0xFF0F172A),
+    );
+    // Fluted adjustment knob on top
+    _buildSolidCylinderY(
+      faces,
+      const Vector3(wiperX, -28, 0),
+      4.0,
+      7.0,
+      14,
+      const Color(0xFF1E293B),
+    );
+    // Machined Spring Brass Wiper Blade Contact (pressing firmly against top silver brush track)
+    _buildSolidBox(
+      faces,
+      const Vector3(wiperX - 5, -13, -5),
+      const Vector3(10, 6.5, 10),
+      const Color(0xFFCA8A04),
+      isMetallic: true,
+    );
 
-    // Brass Wiper Contact Finger
-    _buildSolidBox(faces, const Vector3(-4, -14, -4), const Vector3(8, 8, 8),
-        const Color(0xFFCA8A04), isMetallic: true);
-
-    // Heavy Brass Terminal Binding Posts
-    _buildSolidCylinderZ(faces, Vector3(-length / 2 - 6, 20, -4), 8, 5, 10,
-        const Color(0xFFEAB308), isMetallic: true);
-    _buildSolidCylinderZ(faces, Vector3(length / 2 - 2, 20, -4), 8, 5, 10,
-        const Color(0xFFEAB308), isMetallic: true);
+    // 7. Heavy Brass Knurled Terminal Binding Posts (2 for coil ends, 1 for slider bar)
+    // Left coil terminal
+    _buildSolidCylinderZ(
+      faces,
+      Vector3(-length / 2 - 2, 16, -14),
+      10,
+      4.5,
+      10,
+      const Color(0xFFEAB308),
+      isMetallic: true,
+    );
+    // Right coil terminal
+    _buildSolidCylinderZ(
+      faces,
+      Vector3(length / 2 - 2, 16, -14),
+      10,
+      4.5,
+      10,
+      const Color(0xFFEAB308),
+      isMetallic: true,
+    );
+    // Top slider guide bar terminal (Right top)
+    _buildSolidCylinderZ(
+      faces,
+      Vector3(length / 2 - 2, -18, -14),
+      10,
+      4.5,
+      10,
+      const Color(0xFFEAB308),
+      isMetallic: true,
+    );
   }
 
   /// 5. Preset Trimmer (Bourns 3296 sealed blue cermet case, golden screw, 3 pins)

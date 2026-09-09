@@ -159,7 +159,6 @@ class LearnScreen extends StatelessWidget {
 
     return LiquidGlassTopicCard(
       title: 'What is a Resistor?',
-      topicNumber: 'SECTION A • DEFINITION',
       icon: Icons.info_outline_rounded,
       accentColor: const Color(0xFF38BDF8),
       children: [
@@ -403,7 +402,6 @@ class LearnScreen extends StatelessWidget {
 
     return LiquidGlassTopicCard(
       title: 'Function of a Resistor',
-      topicNumber: 'SECTION B • FUNCTIONS',
       icon: Icons.account_tree_rounded,
       accentColor: const Color(0xFF2DD4BF),
       children: [
@@ -491,7 +489,6 @@ class LearnScreen extends StatelessWidget {
   Widget _buildSectionC(BuildContext context) {
     return LiquidGlassTopicCard(
       title: "Ohm's Law & Calculations",
-      topicNumber: "SECTION C • OHM'S LAW",
       icon: Icons.calculate_rounded,
       accentColor: const Color(0xFFA78BFA),
       children: [
@@ -709,7 +706,6 @@ class LearnScreen extends StatelessWidget {
 
     return LiquidGlassTopicCard(
       title: 'Measuring Resistance (Multimeter)',
-      topicNumber: 'SECTION D • MEASUREMENT',
       icon: Icons.speed_rounded,
       accentColor: const Color(0xFFF59E0B),
       children: [
@@ -794,7 +790,6 @@ class LearnScreen extends StatelessWidget {
   Widget _buildSectionE(BuildContext context) {
     return LiquidGlassTopicCard(
       title: 'Resistor Tolerance',
-      topicNumber: 'SECTION E • TOLERANCE',
       icon: Icons.tune_rounded,
       accentColor: const Color(0xFF10B981),
       children: [
@@ -926,7 +921,6 @@ class LearnScreen extends StatelessWidget {
 
     return LiquidGlassTopicCard(
       title: 'Power Rating & Joule Heating',
-      topicNumber: 'SECTION F • POWER RATING',
       icon: Icons.whatshot_rounded,
       accentColor: const Color(0xFFEF4444),
       children: [
@@ -1052,7 +1046,6 @@ class LearnScreen extends StatelessWidget {
 
     return LiquidGlassTopicCard(
       title: 'Four-Band Color Code & Mnemonics',
-      topicNumber: 'SECTION G • COLOR CODES',
       icon: Icons.palette_rounded,
       accentColor: const Color(0xFF38BDF8),
       children: [
@@ -1207,7 +1200,6 @@ class LearnScreen extends StatelessWidget {
 
     return LiquidGlassTopicCard(
       title: 'Remember These (Viva Essentials)',
-      topicNumber: 'SECTION H • GOLDEN RULES',
       icon: Icons.bookmark_added_rounded,
       accentColor: const Color(0xFFF59E0B),
       children: [
