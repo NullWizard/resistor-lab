@@ -209,12 +209,14 @@ class LearnScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.schema_rounded, color: Color(0xFF38BDF8), size: 17),
                   const SizedBox(width: 8),
-                  Text(
-                    'Standard Schematic Symbols in Circuit Diagrams',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: const Color(0xFFF8FAFC),
+                  Expanded(
+                    child: Text(
+                      'Standard Schematic Symbols in Circuit Diagrams',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: const Color(0xFFF8FAFC),
+                      ),
                     ),
                   ),
                 ],
@@ -225,7 +227,7 @@ class LearnScreen extends StatelessWidget {
                   // IEEE / US Zig-Zag
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFF040A14).withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(12),
@@ -235,33 +237,38 @@ class LearnScreen extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          CustomPaint(
-                            size: const Size(120, 28),
-                            painter: _ZigZagSymbolPainter(color: const Color(0xFF38BDF8)),
+                          SizedBox(
+                            height: 28,
+                            width: double.infinity,
+                            child: CustomPaint(
+                              painter: _ZigZagSymbolPainter(color: const Color(0xFF38BDF8)),
+                            ),
                           ),
                           const SizedBox(height: 10),
                           Text(
                             'IEEE / US Standard',
+                            textAlign: TextAlign.center,
                             style: GoogleFonts.spaceGrotesk(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                               color: const Color(0xFF38BDF8),
                             ),
                           ),
-                          Text(
+                          const Text(
                             'Zig-zag line symbol',
-                            style: TextStyle(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
 
                   // IEC / International Box
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFF040A14).withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(12),
@@ -271,22 +278,27 @@ class LearnScreen extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          CustomPaint(
-                            size: const Size(120, 28),
-                            painter: _IecBoxSymbolPainter(color: const Color(0xFF38BDF8)),
+                          SizedBox(
+                            height: 28,
+                            width: double.infinity,
+                            child: CustomPaint(
+                              painter: _IecBoxSymbolPainter(color: const Color(0xFF38BDF8)),
+                            ),
                           ),
                           const SizedBox(height: 10),
                           Text(
                             'IEC Standard',
+                            textAlign: TextAlign.center,
                             style: GoogleFonts.spaceGrotesk(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                               color: const Color(0xFF38BDF8),
                             ),
                           ),
-                          Text(
+                          const Text(
                             'Rectangular box symbol',
-                            style: TextStyle(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                           ),
                         ],
                       ),
@@ -607,12 +619,14 @@ class LearnScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.lightbulb_rounded, color: Color(0xFFF59E0B), size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Viva Lab Example Calculation',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: const Color(0xFFFBBF24),
+                  Expanded(
+                    child: Text(
+                      'Viva Lab Example Calculation',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: const Color(0xFFFBBF24),
+                      ),
                     ),
                   ),
                 ],
@@ -816,76 +830,99 @@ class LearnScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.linear_scale_rounded, color: Color(0xFF10B981), size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Tolerance Range Visualizer: 1,000 Ω ± 5% (Gold)',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13.5,
-                      color: const Color(0xFF34D399),
+                  Expanded(
+                    child: Text(
+                      'Tolerance Range Visualizer: 1,000 Ω ± 5% (Gold)',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: const Color(0xFF34D399),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              // Visual Gauge Line
+              // Visual Gauge Readout Labels
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '950 Ω (-5% Min)',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF6EE7B7),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.20),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      '1,000 Ω (Nominal)',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFF8FAFC),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '1,050 Ω (+5% Max)',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF6EE7B7),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Continuous Visual Spectrum Gauge Track
               Container(
-                height: 38,
+                height: 18,
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF030A0D),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.25)),
+                  borderRadius: BorderRadius.circular(9),
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFEF4444).withValues(alpha: 0.35),
+                      const Color(0xFF10B981).withValues(alpha: 0.50),
+                      const Color(0xFF10B981),
+                      const Color(0xFF10B981).withValues(alpha: 0.50),
+                      const Color(0xFFEF4444).withValues(alpha: 0.35),
+                    ],
+                    stops: const [0.0, 0.20, 0.50, 0.80, 1.0],
+                  ),
+                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '950 Ω (-5%)',
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF6EE7B7),
-                          ),
+                child: Center(
+                  child: Container(
+                    width: 3,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          blurRadius: 4,
                         ),
-                      ),
+                      ],
                     ),
-                    Container(width: 1, height: 24, color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                    Expanded(
-                      child: Container(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                        child: Center(
-                          child: Text(
-                            '1,000 Ω (NOMINAL)',
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFF8FAFC),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(width: 1, height: 24, color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '1050 Ω (+5%)',
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF6EE7B7),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                'Deviation formula: 5% of 1,000 Ω = ±50 Ω. Any reading between 950 Ω and 1050 Ω is 100% acceptable.',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              const Text(
+                'Deviation formula: ±5% of 1,000 Ω = ±50 Ω. Any reading between 950 Ω and 1,050 Ω is 100% acceptable.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), height: 1.35),
               ),
             ],
           ),
@@ -1072,12 +1109,14 @@ class LearnScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.psychology_rounded, color: Color(0xFF38BDF8), size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'Memory Mnemonic (Standard Lab Formula):',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: const Color(0xFFBAE6FD),
+                  Expanded(
+                    child: Text(
+                      'Memory Mnemonic (Standard Lab Formula):',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: const Color(0xFFBAE6FD),
+                      ),
                     ),
                   ),
                 ],
@@ -1388,7 +1427,7 @@ class _ToleranceBadge extends StatelessWidget {
   }
 }
 
-/// Custom painter for the IEEE (US) Zig-Zag resistor schematic symbol.
+/// Custom painter for the IEEE (US) Zig-Zag resistor schematic symbol (Dynamic Responsive Width).
 class _ZigZagSymbolPainter extends CustomPainter {
   final Color color;
 
@@ -1405,35 +1444,46 @@ class _ZigZagSymbolPainter extends CustomPainter {
 
     final path = Path();
     final midY = size.height / 2;
-
-    // Left lead
-    path.moveTo(0, midY);
-    path.lineTo(25, midY);
-
-    // Zig-Zag peaks
-    path.lineTo(32, midY - 9);
-    path.lineTo(46, midY + 9);
-    path.lineTo(60, midY - 9);
-    path.lineTo(74, midY + 9);
-    path.lineTo(88, midY - 9);
-    path.lineTo(95, midY);
-
-    // Right lead
-    path.lineTo(size.width, midY);
-
-    canvas.drawPath(path, paint);
+    final w = size.width;
 
     // Terminal dots
     final dotPaint = Paint()..color = color;
-    canvas.drawCircle(Offset(2, midY), 2.5, dotPaint);
-    canvas.drawCircle(Offset(size.width - 2, midY), 2.5, dotPaint);
+    canvas.drawCircle(Offset(3, midY), 2.5, dotPaint);
+    canvas.drawCircle(Offset(w - 3, midY), 2.5, dotPaint);
+
+    // Compute leads and responsive zig-zag width
+    final leadLen = (w * 0.20).clamp(8.0, 24.0);
+    final zigzagStart = leadLen;
+    final zigzagEnd = w - leadLen;
+    final zigzagWidth = zigzagEnd - zigzagStart;
+
+    // Left lead
+    path.moveTo(3, midY);
+    path.lineTo(zigzagStart, midY);
+
+    // Zig-Zag peaks (scaled proportionally across zigzagWidth)
+    const numPeaks = 6;
+    final dx = zigzagWidth / numPeaks;
+    final peakH = 9.0.clamp(4.0, size.height * 0.40);
+
+    for (int i = 1; i <= numPeaks; i++) {
+      final px = zigzagStart + dx * (i - 0.5);
+      final py = (i % 2 == 1) ? midY - peakH : midY + peakH;
+      path.lineTo(px, py);
+    }
+    path.lineTo(zigzagEnd, midY);
+
+    // Right lead
+    path.lineTo(w - 3, midY);
+
+    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant _ZigZagSymbolPainter oldDelegate) => oldDelegate.color != color;
 }
 
-/// Custom painter for the IEC (International) rectangular box resistor schematic symbol.
+/// Custom painter for the IEC (International) rectangular box resistor schematic symbol (Dynamic Responsive Width).
 class _IecBoxSymbolPainter extends CustomPainter {
   final Color color;
 
@@ -1448,21 +1498,28 @@ class _IecBoxSymbolPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final midY = size.height / 2;
-
-    // Left lead
-    canvas.drawLine(const Offset(0, 14), const Offset(30, 14), paint);
-
-    // Box
-    final rect = Rect.fromCenter(center: Offset(size.width / 2, midY), width: 60, height: 16);
-    canvas.drawRect(rect, paint);
-
-    // Right lead
-    canvas.drawLine(Offset(size.width - 30, 14), Offset(size.width, 14), paint);
+    final w = size.width;
 
     // Terminal dots
     final dotPaint = Paint()..color = color;
-    canvas.drawCircle(Offset(2, midY), 2.5, dotPaint);
-    canvas.drawCircle(Offset(size.width - 2, midY), 2.5, dotPaint);
+    canvas.drawCircle(Offset(3, midY), 2.5, dotPaint);
+    canvas.drawCircle(Offset(w - 3, midY), 2.5, dotPaint);
+
+    // Box dimensions scaled to available width
+    final boxW = (w * 0.52).clamp(32.0, 68.0);
+    const boxH = 16.0;
+    final boxLeft = (w - boxW) / 2;
+    final boxRight = boxLeft + boxW;
+
+    // Left lead
+    canvas.drawLine(Offset(3, midY), Offset(boxLeft, midY), paint);
+
+    // Box
+    final rect = Rect.fromCenter(center: Offset(w / 2, midY), width: boxW, height: boxH);
+    canvas.drawRect(rect, paint);
+
+    // Right lead
+    canvas.drawLine(Offset(boxRight, midY), Offset(w - 3, midY), paint);
   }
 
   @override

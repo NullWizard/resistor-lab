@@ -98,25 +98,25 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, bgPaint);
 
     final center = Offset(size.width * 0.50, size.height * 0.44);
-    final maxRadius = math.max(size.width, size.height) * 0.72;
+    final maxRadius = math.max(size.width, size.height) * 0.75;
     final t = progress * 2.0 * math.pi;
 
-    // 2. Soft, Seamless Ambient Chromatic Glow (Low-opacity, diffused center that blends into space)
+    // 2. Luminous Ambient Chromatic Aura (Brighter & richer bloom)
     final ambientAuraPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF8B5CF6).withValues(alpha: 0.18), // Soft Violet
-          const Color(0xFF00E5FF).withValues(alpha: 0.14), // Soft Cyan
-          const Color(0xFFEC4899).withValues(alpha: 0.08), // Soft Magenta
+          const Color(0xFF8B5CF6).withValues(alpha: 0.34), // Rich Violet
+          const Color(0xFF00E5FF).withValues(alpha: 0.30), // Electric Cyan
+          const Color(0xFFEC4899).withValues(alpha: 0.20), // Radiant Magenta
           Colors.transparent,
         ],
-        stops: const [0.0, 0.40, 0.70, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.85))
+        stops: const [0.0, 0.38, 0.68, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90))
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 55.0);
-    canvas.drawCircle(center, maxRadius * 0.85, ambientAuraPaint);
+    canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
 
     // 3. Smooth Concentric Sine Waves Radiating Outward from Middle (Like Siri)
-    // 6 radiating harmonic wave rings with heavy Gaussian blur and seamless origin
+    // 6 radiating harmonic wave rings with heavy Gaussian blur and bright neon presence
     final wavePalette = [
       const Color(0xFF00E5FF), // Electric Cyan
       const Color(0xFFA855F7), // Radiant Violet
@@ -132,12 +132,11 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       final ringProgress = (progress + k / numRadiatingRings) % 1.0;
       final rBase = ringProgress * maxRadius;
 
-      // Soft parabolic fade: 0 at center, gentle peak mid-way, soft fade at perimeter
-      // Smoothly merges into center without creating a dense central dot
+      // Parabolic fade with increased brightness
       final fade = math.sin(ringProgress * math.pi);
-      final alpha = (fade * fade * 0.38).clamp(0.0, 1.0);
+      final alpha = (fade * 0.68).clamp(0.0, 1.0);
 
-      if (alpha < 0.015) continue;
+      if (alpha < 0.02) continue;
 
       final color = wavePalette[k % wavePalette.length];
       final path = Path();
@@ -164,21 +163,29 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       path.close();
 
       // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow
-      final blurAmount = 42.0 + 20.0 * ringProgress;
+      final blurAmount = 38.0 + 20.0 * ringProgress;
       final waveStrokePaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 16.0 + 12.0 * ringProgress
-        ..color = color.withValues(alpha: alpha)
+        ..strokeWidth = 22.0 + 14.0 * ringProgress
+        ..color = color.withValues(alpha: alpha * 0.80)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurAmount);
 
       canvas.drawPath(path, waveStrokePaint);
 
-      // Delicate soft harmonic core line inside the heavy blur
+      // Vivid chromatic inner glow
+      final midGlowPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6.0 + 4.0 * ringProgress
+        ..color = color.withValues(alpha: alpha * 0.90)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.0);
+
+      canvas.drawPath(path, midGlowPaint);
+
+      // Bright delicate harmonic core line inside the heavy blur
       final coreLinePaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..color = Colors.white.withValues(alpha: alpha * 0.40)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8.0);
+        ..strokeWidth = 2.4
+        ..color = Colors.white.withValues(alpha: alpha * 0.70);
 
       canvas.drawPath(path, coreLinePaint);
     }
@@ -189,7 +196,6 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       oldDelegate.progress != progress;
 }
 
-/// Custom painter for subtle holographic technical grid points.
 class _TechGridPainter extends CustomPainter {
   const _TechGridPainter();
 
@@ -219,7 +225,7 @@ class _TechGridPainter extends CustomPainter {
 /// - Clean, subtle physical glass refractive bevel rim.
 /// - ZERO fake white patches or opaque sticker shapes.
 /// - Static GPU caching via RepaintBoundary for instant, zero-lag touch interactions.
-class GlassContainer extends StatelessWidget {
+class GlassContainer extends StatefulWidget {
   final Widget child;
   final double borderRadius;
   final EdgeInsetsGeometry? padding;
@@ -233,92 +239,94 @@ class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
     required this.child,
-    this.borderRadius = 28.0,
+    this.borderRadius = 26.0,
     this.padding,
     this.margin,
     this.tintColor,
     this.glowColor,
-    this.blurSigma = 28.0,
+    this.blurSigma = 26.0,
     this.borderWidth = 1.2,
     this.onTap,
   });
 
   @override
+  State<GlassContainer> createState() => _GlassContainerState();
+}
+
+class _GlassContainerState extends State<GlassContainer> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    // Substantial grayish translucent liquid glass (alpha: 0.38)
+    // Calibrated transparent grayish liquid glass (alpha: 0.22)
     final effectiveTint =
-        tintColor ?? const Color(0xFF0F172A).withValues(alpha: 0.38);
+        widget.tintColor ?? const Color(0xFF0F172A).withValues(alpha: 0.22);
 
     Widget content = Container(
-      padding: padding ?? const EdgeInsets.all(20.0),
+      padding: widget.padding ?? const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
         color: effectiveTint,
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.08),
-            const Color(0xFF64748B).withValues(alpha: 0.03),
+            Colors.white.withValues(alpha: _isPressed ? 0.12 : 0.05),
+            const Color(0xFF64748B).withValues(alpha: 0.02),
             Colors.transparent,
-            const Color(0xFF1E293B).withValues(alpha: 0.07),
+            const Color(0xFF1E293B).withValues(alpha: 0.04),
           ],
           stops: const [0.0, 0.30, 0.70, 1.0],
         ),
       ),
-      child: child,
+      child: widget.child,
     );
 
-    if (onTap != null) {
-      content = Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(borderRadius),
-          splashColor: Colors.white.withValues(alpha: 0.10),
-          highlightColor: Colors.white.withValues(alpha: 0.05),
-          child: content,
-        ),
-      );
-    }
+    final isTappable = widget.onTap != null;
 
-    return RepaintBoundary(
+    final containerBody = RepaintBoundary(
       child: Container(
-        margin: margin,
+        margin: widget.margin,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(borderRadius),
+          borderRadius: BorderRadius.circular(widget.borderRadius),
           boxShadow: [
             // Soft ambient occlusion shadow
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 28,
-              offset: const Offset(0, 12),
+              color: Colors.black.withValues(alpha: _isPressed ? 0.30 : 0.45),
+              blurRadius: _isPressed ? 16 : 28,
+              offset: Offset(0, _isPressed ? 4 : 12),
             ),
-            // Subtle neutral glass edge reflection
+            // Subtle neutral glass edge reflection / glow
             BoxShadow(
-              color: Colors.white.withValues(alpha: 0.03),
-              blurRadius: 24,
-              spreadRadius: -2,
-              offset: const Offset(0, 4),
+              color: (widget.glowColor ?? const Color(0xFF00E5FF))
+                  .withValues(alpha: _isPressed ? 0.12 : 0.03),
+              blurRadius: _isPressed ? 20 : 16,
+              spreadRadius: _isPressed ? 1 : -2,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(borderRadius),
+          borderRadius: BorderRadius.circular(widget.borderRadius),
           child: kIsWeb
               ? CustomPaint(
                   foregroundPainter: _RealLiquidGlassBorderPainter(
-                    borderRadius: borderRadius,
-                    borderWidth: borderWidth,
+                    borderRadius: widget.borderRadius,
+                    borderWidth: widget.borderWidth,
+                    isPressed: _isPressed,
                   ),
                   child: content,
                 )
               : BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+                  filter: ImageFilter.blur(
+                    sigmaX: widget.blurSigma,
+                    sigmaY: widget.blurSigma,
+                  ),
                   child: CustomPaint(
                     foregroundPainter: _RealLiquidGlassBorderPainter(
-                      borderRadius: borderRadius,
-                      borderWidth: borderWidth,
+                      borderRadius: widget.borderRadius,
+                      borderWidth: widget.borderWidth,
+                      isPressed: _isPressed,
                     ),
                     child: content,
                   ),
@@ -326,6 +334,26 @@ class GlassContainer extends StatelessWidget {
         ),
       ),
     );
+
+    if (isTappable) {
+      return GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onTap?.call();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedScale(
+          scale: _isPressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          child: containerBody,
+        ),
+      );
+    }
+
+    return containerBody;
   }
 }
 
@@ -334,14 +362,16 @@ class GlassContainer extends StatelessWidget {
 /// Features clean, realistic glass refraction bevels:
 /// - Clean silver-white 45° light catch on the outer edge.
 /// - Micro-inward secondary refraction bevel stroke simulating real glass thickness.
-/// - NO fake white patches or opaque sticker shapes.
+/// - Dynamic responsive glow catch on press.
 class _RealLiquidGlassBorderPainter extends CustomPainter {
   final double borderRadius;
   final double borderWidth;
+  final bool isPressed;
 
   const _RealLiquidGlassBorderPainter({
     required this.borderRadius,
     required this.borderWidth,
+    this.isPressed = false,
   });
 
   @override
@@ -357,8 +387,8 @@ class _RealLiquidGlassBorderPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.50),
-          const Color(0xFFCBD5E1).withValues(alpha: 0.22),
+          Colors.white.withValues(alpha: isPressed ? 0.75 : 0.50),
+          const Color(0xFFCBD5E1).withValues(alpha: isPressed ? 0.40 : 0.22),
           Colors.white.withValues(alpha: 0.05),
           const Color(0xFF94A3B8).withValues(alpha: 0.12),
         ],
@@ -381,7 +411,7 @@ class _RealLiquidGlassBorderPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: 0.18),
+            Colors.white.withValues(alpha: isPressed ? 0.35 : 0.18),
             Colors.transparent,
           ],
           stops: const [0.0, 0.35],
@@ -394,7 +424,8 @@ class _RealLiquidGlassBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RealLiquidGlassBorderPainter oldDelegate) =>
       oldDelegate.borderRadius != borderRadius ||
-      oldDelegate.borderWidth != borderWidth;
+      oldDelegate.borderWidth != borderWidth ||
+      oldDelegate.isPressed != isPressed;
 }
 
 /// VisionOS & Liquid Glass style Rounded Capsule Pill.
