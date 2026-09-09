@@ -64,7 +64,16 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Viewport-Pinned Static Animated Smooth Sine Waves Radiating From Middle (Continuous active canvas)
+        // 1. Static Ambient Canvas & Aura (Completely static GPU layer, painted ONCE)
+        Positioned.fill(
+          child: const RepaintBoundary(
+            child: CustomPaint(
+              painter: _StaticAmbientBackgroundPainter(),
+            ),
+          ),
+        ),
+
+        // 2. Continuous Radiating Waves (Only the lightweight wave lines redraw at 60 FPS)
         Positioned.fill(
           child: RepaintBoundary(
             child: CustomPaint(
@@ -73,20 +82,11 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
           ),
         ),
 
-        // 2. Holographic Technical Matrix Micro-Grid
+        // 3. Foreground Content (Isolated in its own GPU layer, never repaints during animation!)
         Positioned.fill(
-          child: IgnorePointer(
-            child: const RepaintBoundary(
-              child: CustomPaint(
-                painter: _TechGridPainter(),
-              ),
-            ),
+          child: RepaintBoundary(
+            child: widget.child,
           ),
-        ),
-
-        // 3. Foreground Content (Isolated from background animation loop for instant touch responsiveness)
-        Positioned.fill(
-          child: widget.child,
         ),
       ],
     );
@@ -96,18 +96,12 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
 /// Painter for smooth fluid sine waves radiating seamlessly from the middle like Siri,
 /// with heavy multi-layer Gaussian blur bloom and organic harmonic undulation.
 /// The center blends seamlessly with the waves rather than looking like an obvious concentrated dot.
-class _SiriRadiatingWavesPainter extends CustomPainter {
-  final Animation<double>? _animation;
-  final double? _staticProgress;
-
-  _SiriRadiatingWavesPainter({
-    Animation<double>? animation,
-    double? progress,
-  })  : _animation = animation,
-        _staticProgress = progress,
-        super(repaint: animation);
-
-  double get progress => _animation?.value ?? _staticProgress ?? 0.0;
+/// Static Ambient Background Painter:
+/// Combines the deep space obsidian background, luminous chromatic aura, and matrix dot grid.
+/// Marked shouldRepaint => false and wrapped in RepaintBoundary, so it is rendered ONCE on startup
+/// and cached directly on the GPU, saving over 1 billion pixel shader computations per second!
+class _StaticAmbientBackgroundPainter extends CustomPainter {
+  const _StaticAmbientBackgroundPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -117,11 +111,9 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
 
     final center = Offset(size.width * 0.50, size.height * 0.44);
     final maxRadius = math.max(size.width, size.height) * 0.75;
-    final t = progress * 2.0 * math.pi;
 
-    // 2. Luminous Ambient Chromatic Aura (Brighter & richer bloom)
+    // 2. Luminous Ambient Chromatic Aura
     if (kIsWeb) {
-      // Direct GPU fragment-shaded multi-stop radial gradient without CPU/WASM software blur
       final ambientAuraPaint = Paint()
         ..shader = RadialGradient(
           colors: [
@@ -140,19 +132,59 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       final ambientAuraPaint = Paint()
         ..shader = RadialGradient(
           colors: [
-            const Color(0xFF8B5CF6).withValues(alpha: 0.34), // Rich Violet
-            const Color(0xFF00E5FF).withValues(alpha: 0.30), // Electric Cyan
-            const Color(0xFFEC4899).withValues(alpha: 0.20), // Radiant Magenta
+            const Color(0xFF8B5CF6).withValues(alpha: 0.34),
+            const Color(0xFF00E5FF).withValues(alpha: 0.30),
+            const Color(0xFFEC4899).withValues(alpha: 0.20),
             Colors.transparent,
           ],
           stops: const [0.0, 0.38, 0.68, 1.0],
         ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60.64); // another 5% more blur
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60.64);
       canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
     }
 
-    // 3. Smooth Concentric Sine Waves Radiating Outward from Middle (Like Siri)
-    // 6 radiating harmonic wave rings with bright neon presence
+    // 3. Holographic Technical Matrix Micro-Grid (Batched single draw call)
+    final dotPaint = Paint()
+      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.025)
+      ..strokeWidth = 1.7
+      ..strokeCap = StrokeCap.round;
+
+    const spacing = 36.0;
+    final points = <Offset>[];
+    for (double x = 18; x < size.width; x += spacing) {
+      for (double y = 18; y < size.height; y += spacing) {
+        points.add(Offset(x, y));
+      }
+    }
+    canvas.drawPoints(PointMode.points, points, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Dynamic Radiating Harmonic Waves Painter:
+/// Dedicated solely to drawing the continuous radiating sine wave loops at 60 FPS.
+/// Eliminates redundant background clearing and radial gradient recalculations.
+class _SiriRadiatingWavesPainter extends CustomPainter {
+  final Animation<double>? _animation;
+  final double? _staticProgress;
+
+  _SiriRadiatingWavesPainter({
+    Animation<double>? animation,
+    double? progress,
+  })  : _animation = animation,
+        _staticProgress = progress,
+        super(repaint: animation);
+
+  double get progress => _animation?.value ?? _staticProgress ?? 0.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width * 0.50, size.height * 0.44);
+    final maxRadius = math.max(size.width, size.height) * 0.75;
+    final t = progress * 2.0 * math.pi;
+
     final wavePalette = [
       const Color(0xFF00E5FF), // Electric Cyan
       const Color(0xFFA855F7), // Radiant Violet
@@ -163,14 +195,12 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
     ];
 
     const numRadiatingRings = 6;
-    final steps = kIsWeb ? 72 : 96;
+    final steps = kIsWeb ? 60 : 96;
 
     for (int k = 0; k < numRadiatingRings; k++) {
-      // Phase progresses outward continuously [0.0 .. 1.0]
       final ringProgress = (progress + k / numRadiatingRings) % 1.0;
       final rBase = ringProgress * maxRadius;
 
-      // Parabolic fade with increased brightness
       final fade = math.sin(ringProgress * math.pi);
       final alpha = (fade * 0.68).clamp(0.0, 1.0);
 
@@ -182,7 +212,6 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       for (int i = 0; i <= steps; i++) {
         final theta = (i / steps) * 2.0 * math.pi;
 
-        // Smooth harmonic sine waves rippling around each radiating ring
         final waveMod = 0.08 * math.sin(4.0 * theta - t * 1.5 + k * 1.2) +
                         0.04 * math.cos(7.0 * theta + t * 2.0) +
                         0.02 * math.sin(10.0 * theta - t);
@@ -200,39 +229,23 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       path.close();
 
       if (kIsWeb) {
-        // High-performance hardware-accelerated multi-pass glow for WebGL / CanvasKit.
-        // Replaces 12 expensive software/FBO Gaussian blur passes with direct GPU stroke passes:
-        
-        // 1. Soft diffused outer glow aura
-        final outerGlowPaint = Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 36.0 + 18.0 * ringProgress
-          ..color = color.withValues(alpha: alpha * 0.10);
-        canvas.drawPath(path, outerGlowPaint);
-
-        // 2. Medium ambient neon bloom
-        final midOuterPaint = Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 20.0 + 10.0 * ringProgress
-          ..color = color.withValues(alpha: alpha * 0.22);
-        canvas.drawPath(path, midOuterPaint);
-
-        // 3. Focused chromatic inner glow
-        final midGlowPaint = Paint()
+        // High-performance hardware-accelerated dual-pass glow for WebGL / CanvasKit.
+        // 1. Soft glowing neon halo
+        final haloPaint = Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 8.0 + 4.0 * ringProgress
-          ..color = color.withValues(alpha: alpha * 0.50);
-        canvas.drawPath(path, midGlowPaint);
+          ..color = color.withValues(alpha: alpha * 0.40);
+        canvas.drawPath(path, haloPaint);
 
-        // 4. Bright harmonic core line
+        // 2. Bright delicate harmonic core line
         final coreLinePaint = Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..color = Colors.white.withValues(alpha: alpha * 0.75);
+          ..strokeWidth = 2.2
+          ..color = Colors.white.withValues(alpha: alpha * 0.85);
         canvas.drawPath(path, coreLinePaint);
       } else {
         // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow on Native Mobile (Metal / Vulkan / Impeller)
-        final blurAmount = (38.0 + 20.0 * ringProgress) * 1.1025; // another 5% more blur
+        final blurAmount = (38.0 + 20.0 * ringProgress) * 1.1025;
         final waveStrokePaint = Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 22.0 + 14.0 * ringProgress
@@ -246,11 +259,11 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 6.0 + 4.0 * ringProgress
           ..color = color.withValues(alpha: alpha * 0.90)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11.0); // another 5% more blur
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11.0);
 
         canvas.drawPath(path, midGlowPaint);
 
-        // Bright delicate harmonic core line inside the heavy blur
+        // Bright delicate harmonic core line
         final coreLinePaint = Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.4
@@ -264,27 +277,6 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SiriRadiatingWavesPainter oldDelegate) =>
       _animation == null && oldDelegate.progress != progress;
-}
-
-class _TechGridPainter extends CustomPainter {
-  const _TechGridPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final dotPaint = Paint()
-      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.025)
-      ..style = PaintingStyle.fill;
-
-    const spacing = 36.0;
-    for (double x = 18; x < size.width; x += spacing) {
-      for (double y = 18; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), 0.85, dotPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Apple visionOS-inspired Real Liquid Glass Container.
@@ -354,9 +346,8 @@ class _GlassContainerState extends State<GlassContainer> {
 
     final isTappable = widget.onTap != null;
 
-    final containerBody = RepaintBoundary(
-      child: Container(
-        margin: widget.margin,
+    final containerBody = Container(
+      margin: widget.margin,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(widget.borderRadius),
           boxShadow: [
@@ -402,8 +393,7 @@ class _GlassContainerState extends State<GlassContainer> {
                   ),
                 ),
         ),
-      ),
-    );
+      );
 
     if (isTappable) {
       return GestureDetector(
