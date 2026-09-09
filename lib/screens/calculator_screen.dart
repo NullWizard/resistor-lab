@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/resistor_scanner_service.dart';
+import '../widgets/glass_components.dart';
 
 /// Screen for the Resistor Color Code Calculator.
 ///
@@ -103,7 +104,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Color Code Calculator'),
         actions: [
           IconButton(
@@ -113,15 +117,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+      body: FuturisticBackground(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 80.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   // Number of Bands Selector
                   _buildBandCountSelector(theme),
                   const SizedBox(height: 14),
@@ -170,8 +175,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Number of Bands selector with choices 4, 5, 6.
   Widget _buildBandCountSelector(ThemeData theme) {
@@ -381,91 +387,118 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       legendChips.add(_buildLegendChip('TCR', tempCo.name, tempCo.color));
     }
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 12.0),
-        child: Column(
-          children: [
-            Text(
-              'Resistor Preview',
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurfaceVariant,
-                letterSpacing: 1.0,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Resistor Axial Body with Leads
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Left Terminal Wire / Lead
-                Container(
-                  width: 32,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade600,
-                    borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(2),
-                    ),
-                  ),
+    return GlassContainer(
+      borderRadius: 20,
+      glowColor: const Color(0xFF00E5FF),
+      padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 14.0),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.palette_rounded, size: 16, color: Color(0xFF00E5FF)),
+              const SizedBox(width: 6),
+              Text(
+                'RESISTOR PREVIEW',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF00E5FF),
+                  letterSpacing: 1.2,
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
 
-                // Ceramic Resistor Body
-                Container(
-                  width: _bandCount == 6 ? 240 : 220,
-                  height: 64,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8D7BE),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFC7B299),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
+          // Resistor Axial Body with Metallic Leads
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Left Terminal Wire / Lead
+              Container(
+                width: 34,
+                height: 5,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFFF1F5F9),
+                      Color(0xFF94A3B8),
+                      Color(0xFF475569),
                     ],
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: stripes,
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(3),
                   ),
                 ),
+              ),
 
-                // Right Terminal Wire / Lead
-                Container(
-                  width: 32,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade600,
-                    borderRadius: const BorderRadius.horizontal(
-                      right: Radius.circular(2),
+              // Ceramic Resistor Body with Cylindrical Specular Gradient
+              Container(
+                width: _bandCount == 6 ? 240 : 220,
+                height: 66,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFFF5E6D3), // Top specular reflection
+                      Color(0xFFE2CFB4), // Body ceramic
+                      Color(0xFFBFA785), // Bottom shadow
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: stripes,
+                ),
+              ),
+
+              // Right Terminal Wire / Lead
+              Container(
+                width: 34,
+                height: 5,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFFF1F5F9),
+                      Color(0xFF94A3B8),
+                      Color(0xFF475569),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.horizontal(
+                    right: Radius.circular(3),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
-            // Active Color Legend Row
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              alignment: WrapAlignment.center,
-              children: legendChips,
-            ),
-          ],
-        ),
+          // Active Color Legend Row
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: legendChips,
+          ),
+        ],
       ),
     );
   }
@@ -542,18 +575,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Widget _buildResultsCard(BuildContext context, ResistorCalculationResult calc) {
     final theme = Theme.of(context);
 
-    return Card(
-      elevation: 2,
-      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18.0),
-        child: Column(
+    return GlassContainer(
+      borderRadius: 20,
+      glowColor: const Color(0xFF00E5FF),
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
           children: [
             Text(
               'CALCULATED RESISTANCE',
@@ -639,9 +665,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
   /// Helper widget for rendering Minimum and Maximum limit columns.
   Widget _buildLimitColumn(

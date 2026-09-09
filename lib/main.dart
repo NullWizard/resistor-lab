@@ -22,9 +22,9 @@ class ResistorLabApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // High-Precision Black Engineering Theme
-    const darkBackground = Color(0xFF080D1A); // Deep pitch lab canvas
-    const darkSurface = Color(0xFF101726);    // Carbon-slate card surface
+    // High-Precision Obsidian Engineering Theme
+    const darkBackground = Color(0xFF030712); // Deep obsidian space canvas
+    const darkSurface = Color(0xFF0F172A);    // Frosted glass base tint
     const darkBorder = Color(0xFF1E293B);     // Crisp slate divider / border
     const electricCyan = Color(0xFF00E5FF);   // Cyber Cyan primary accent
     const amberAccent = Color(0xFFF59E0B);    // Electric Amber indicator

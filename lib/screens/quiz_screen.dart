@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/glass_components.dart';
 
 /// Clean model representing a quiz question with exactly 4 options.
 class QuizQuestion {
@@ -233,14 +234,19 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Resistor Quiz'),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 780),
-            child: _isQuizCompleted ? _buildResultsView() : _buildQuizView(),
+      body: FuturisticBackground(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 780),
+              child: _isQuizCompleted ? _buildResultsView() : _buildQuizView(),
+            ),
           ),
         ),
       ),
@@ -304,23 +310,17 @@ class _QuizScreenState extends State<QuizScreen> {
           const SizedBox(height: 20),
 
           // Question Card
-          Card(
-            elevation: 0,
-            color: const Color(0xFF101726),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Text(
-                question.question,
-                style: const TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFF8FAFC),
-                  height: 1.4,
-                ),
+          GlassContainer(
+            borderRadius: 18,
+            glowColor: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              question.question,
+              style: const TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFF8FAFC),
+                height: 1.4,
               ),
             ),
           ),

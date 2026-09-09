@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/glass_components.dart';
 
 /// Detailed Educational Screen: Learn About Resistors.
 ///
@@ -17,54 +18,59 @@ class LearnScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Learn About Resistors'),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Topic Banner
-                  _buildHeaderBanner(context),
-                  const SizedBox(height: 20),
+      body: FuturisticBackground(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 110.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Topic Banner
+                    _buildHeaderBanner(context),
+                    const SizedBox(height: 20),
 
-                  // Section A: What is a Resistor?
-                  _buildSectionA(context),
-                  const SizedBox(height: 18),
+                    // Section A: What is a Resistor?
+                    _buildSectionA(context),
+                    const SizedBox(height: 18),
 
-                  // Section B: Function of a Resistor
-                  _buildSectionB(context),
-                  const SizedBox(height: 18),
+                    // Section B: Function of a Resistor
+                    _buildSectionB(context),
+                    const SizedBox(height: 18),
 
-                  // Section C: Ohm's Law
-                  _buildSectionC(context),
-                  const SizedBox(height: 18),
+                    // Section C: Ohm's Law
+                    _buildSectionC(context),
+                    const SizedBox(height: 18),
 
-                  // Section D: Measuring Resistance
-                  _buildSectionD(context),
-                  const SizedBox(height: 18),
+                    // Section D: Measuring Resistance
+                    _buildSectionD(context),
+                    const SizedBox(height: 18),
 
-                  // Section E: Resistor Tolerance
-                  _buildSectionE(context),
-                  const SizedBox(height: 18),
+                    // Section E: Resistor Tolerance
+                    _buildSectionE(context),
+                    const SizedBox(height: 18),
 
-                  // Section F: Power Rating
-                  _buildSectionF(context),
-                  const SizedBox(height: 18),
+                    // Section F: Power Rating
+                    _buildSectionF(context),
+                    const SizedBox(height: 18),
 
-                  // Section G: Resistor Color Code Table
-                  _buildSectionG(context),
-                  const SizedBox(height: 18),
+                    // Section G: Resistor Color Code Table
+                    _buildSectionG(context),
+                    const SizedBox(height: 18),
 
-                  // Section H: Quick Revision ("Remember These")
-                  _buildSectionH(context),
-                  const SizedBox(height: 24),
-                ],
+                    // Section H: Quick Revision ("Remember These")
+                    _buildSectionH(context),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
           ),
@@ -77,22 +83,20 @@ class LearnScreen extends StatelessWidget {
   // TOPIC BANNER
   // ==========================================
   Widget _buildHeaderBanner(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
+    return GlassContainer(
+      borderRadius: 20,
+      glowColor: const Color(0xFF00E5FF),
       padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101726),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.40),
+              ),
             ),
             child: const Icon(
               Icons.menu_book_rounded,
@@ -101,19 +105,21 @@ class LearnScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Resistor Fundamentals & Theory',
-                  style: theme.textTheme.titleMedium?.copyWith(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFFF8FAFC),
+                    fontSize: 17,
+                    color: Color(0xFFF8FAFC),
+                    letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: 4),
+                Text(
                   'Study notes and key concepts for lab experiments and vivas.',
                   style: TextStyle(
                     fontSize: 13,
@@ -649,60 +655,80 @@ class LearnScreen extends StatelessWidget {
       "Power rating (P = I²R) determines safe heat dissipation; 1/4 W (0.25 W) is standard for breadboards.",
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101726),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return GlassContainer(
+      borderRadius: 18,
+      glowColor: const Color(0xFFF59E0B),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.bookmark_added_rounded, color: Color(0xFFF59E0B), size: 22),
-              SizedBox(width: 8),
-              Text(
-                'Remember These (Quick Revision for Viva)',
-                style: TextStyle(
-                  color: Color(0xFFF8FAFC),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.bookmark_added_rounded,
+                  color: Color(0xFFF59E0B),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Remember These (Quick Revision for Viva)',
+                  style: TextStyle(
+                    color: Color(0xFFF8FAFC),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           ...revisionPoints.map(
             (point) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4.0),
-                    child: Icon(Icons.check_circle_outline, color: Color(0xFF00E5FF), size: 14),
+              padding: const EdgeInsets.only(bottom: 10.0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B132B).withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      point,
-                      style: const TextStyle(
-                        color: Color(0xFFCBD5E1),
-                        fontSize: 13,
-                        height: 1.35,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2.0),
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFF00E5FF),
+                        size: 16,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        point,
+                        style: const TextStyle(
+                          color: Color(0xFFCBD5E1),
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -718,38 +744,42 @@ class LearnScreen extends StatelessWidget {
     required Color iconColor,
     required List<Widget> children,
   }) {
-    return Card(
-      elevation: 0,
-      color: const Color(0xFF101726),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: iconColor, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFF8FAFC),
-                    ),
+    return GlassContainer(
+      borderRadius: 18,
+      glowColor: iconColor.withValues(alpha: 0.12),
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: iconColor.withValues(alpha: 0.35),
                   ),
                 ),
-              ],
-            ),
-            const Divider(height: 24, color: Color(0xFF1E293B)),
-            ...children,
-          ],
-        ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFF8FAFC),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24, color: Color(0xFF1E293B)),
+          ...children,
+        ],
       ),
     );
   }

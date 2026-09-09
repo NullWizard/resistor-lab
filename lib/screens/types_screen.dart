@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../widgets/glass_components.dart';
+import '../widgets/resistor_3d_viewer.dart';
 
-/// Screen displaying the comprehensive taxonomy of resistors:
-/// 1. Fixed Resistors (Carbon Composition, Carbon Film, Metal Film, Wirewound)
+/// Screen displaying the comprehensive taxonomy of resistors with interactive
+/// 3D CAD models, structural insights, and visionOS liquid glass styling:
+/// 1. Fixed Resistors (Carbon Composition, Carbon Film, Metal Film, Wirewound, Cement, SMD)
 /// 2. Variable Resistors (Potentiometer, Rheostat, Preset / Trimmer)
 /// 3. Special-Purpose Resistors (LDR, Thermistor, Varistor)
 class TypesScreen extends StatelessWidget {
@@ -10,187 +13,231 @@ class TypesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Types of Resistors'),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Top Overview Banner
-                  _buildHeaderBanner(context),
-                  const SizedBox(height: 22),
+      body: FuturisticBackground(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 960),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 90.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top Overview Glass Banner
+                    _buildHeaderBanner(context),
+                    const SizedBox(height: 24),
 
-                  // CATEGORY 1: FIXED RESISTORS
-                  _buildCategoryHeading(
-                    context,
-                    title: '1. Fixed Resistors',
-                    subtitle: 'Resistors with a permanent, unchanging ohmic resistance value.',
-                    badgeColor: const Color(0xFF38BDF8),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildResponsiveGrid(
-                    context,
-                    children: [
-                      _buildResistorCard(
-                        context,
-                        name: 'Carbon Composition Resistor',
-                        icon: Icons.grain_rounded,
-                        accentColor: const Color(0xFFF59E0B),
-                        whatItDoes:
-                            'Provides fixed electrical resistance with high energy surge absorption capability.',
-                        howItWorks:
-                            'Constructed from a solid rod made of finely ground carbon granules mixed with a ceramic binder. Current passes through microscopic conductive carbon chains.',
-                        application:
-                            'High-voltage power supplies, surge suppression circuits, and vintage radio equipment.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Carbon Film Resistor',
-                        icon: Icons.layers_rounded,
-                        accentColor: const Color(0xFFFBBF24),
-                        whatItDoes:
-                            'General-purpose resistor offering good tolerance (±5%) and better stability than carbon composition.',
-                        howItWorks:
-                            'A thin film of pure carbon is deposited onto an insulating ceramic rod. A helical groove is spiral-cut into the film to achieve the exact target resistance value.',
-                        application:
-                            'Everyday electronic circuits, laboratory breadboard experiments, and consumer electronics.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Metal Film Resistor',
-                        icon: Icons.precision_manufacturing_rounded,
-                        accentColor: const Color(0xFF38BDF8),
-                        whatItDoes:
-                            'High-precision resistor with very low electrical noise and exceptional temperature stability.',
-                        howItWorks:
-                            'A microscopic film of nickel-chromium (Nichrome) or metal oxide is vacuum-sputtered onto an alumina ceramic core and laser-trimmed to tight tolerances (±1% or ±0.1%).',
-                        application:
-                            'Precision laboratory instruments, medical monitoring equipment, and Hi-Fi audio amplifiers.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Wire Wound Resistor',
-                        icon: Icons.linear_scale_rounded,
-                        accentColor: const Color(0xFFF87171),
-                        whatItDoes:
-                            'High-power resistor capable of dissipating substantial heat without thermal breakdown.',
-                        howItWorks:
-                            'Made by winding a high-resistance alloy wire (like Nichrome or Manganin) around an insulated ceramic core, coated in protective vitreous enamel or ceramic cement.',
-                        application:
-                            'High-power amplifiers, motor speed controllers, power supplies, and dummy load banks.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+                    // CATEGORY 1: FIXED RESISTORS
+                    _buildCategoryHeading(
+                      context,
+                      title: '1. Fixed Resistors',
+                      subtitle:
+                          'Permanent ohmic resistance. Drag any 3D model to inspect in 360°.',
+                      badgeColor: const Color(0xFF00E5FF),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildResponsiveGrid(
+                      context,
+                      children: [
+                        _buildResistorCard(
+                          context,
+                          name: 'Carbon Composition Resistor',
+                          modelType: Resistor3DType.carbonComposition,
+                          icon: Icons.grain_rounded,
+                          accentColor: const Color(0xFFF59E0B),
+                          whatItDoes:
+                              'Provides fixed electrical resistance with high energy surge absorption capability.',
+                          howItWorks:
+                              'Constructed from a solid rod of finely ground carbon granules mixed with a ceramic binder. Current passes through microscopic conductive carbon chains.',
+                          application:
+                              'High-voltage power supplies, surge suppression circuits, and vintage radio equipment.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Carbon Film Resistor',
+                          modelType: Resistor3DType.carbonFilm,
+                          icon: Icons.layers_rounded,
+                          accentColor: const Color(0xFFFBBF24),
+                          whatItDoes:
+                              'General-purpose resistor offering good tolerance (±5%) and better stability than carbon composition.',
+                          howItWorks:
+                              'A thin pure carbon film is deposited onto a ceramic rod. A helical spiral groove is cut into the film to achieve the exact target resistance value.',
+                          application:
+                              'Everyday electronic circuits, laboratory breadboard experiments, and consumer electronics.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Metal Film Resistor',
+                          modelType: Resistor3DType.metalFilm,
+                          icon: Icons.precision_manufacturing_rounded,
+                          accentColor: const Color(0xFF00E5FF),
+                          whatItDoes:
+                              'High-precision resistor with ultra-low electrical noise and exceptional temperature stability.',
+                          howItWorks:
+                              'A microscopic film of nickel-chromium (Nichrome) is vacuum-sputtered onto an alumina core and laser-trimmed to tight tolerances (±1% or ±0.1%).',
+                          application:
+                              'Precision laboratory instruments, medical monitoring equipment, and Hi-Fi audio amplifiers.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Wire Wound Resistor',
+                          modelType: Resistor3DType.wireWound,
+                          icon: Icons.linear_scale_rounded,
+                          accentColor: const Color(0xFFF87171),
+                          whatItDoes:
+                              'High-power resistor capable of dissipating substantial heat without thermal breakdown.',
+                          howItWorks:
+                              'Made by winding a high-resistance alloy wire (Nichrome or Manganin) around an insulated ceramic core, coated in vitreous protective enamel.',
+                          application:
+                              'High-power amplifiers, motor speed controllers, power supplies, and dummy load banks.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Cement Power Resistor',
+                          modelType: Resistor3DType.cementPower,
+                          icon: Icons.square_foot_rounded,
+                          accentColor: const Color(0xFFE2E8F0),
+                          whatItDoes:
+                              'Extreme high-power dissipation resistor designed to endure high surge currents safely.',
+                          howItWorks:
+                              'Encases a heavy-duty wirewound resistor inside a rectangular ceramic shell potted with fireproof inorganic cement.',
+                          application:
+                              'Power supply bleeders, automotive ballast resistors, and electrical heating dummy loads.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'SMD Chip Resistor (0805)',
+                          modelType: Resistor3DType.smd,
+                          icon: Icons.memory_rounded,
+                          accentColor: const Color(0xFF38BDF8),
+                          whatItDoes:
+                              'Sub-miniature rectangular chip mounted directly onto PCB surface pads for high-density circuits.',
+                          howItWorks:
+                              'Metal oxide film printed on an alumina ceramic substrate with silver wrap-around solder termination end-caps and numeric 3-digit code.',
+                          application:
+                              'Smartphones, motherboards, laptops, and all modern miniature consumer electronics.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
 
-                  // CATEGORY 2: VARIABLE RESISTORS
-                  _buildCategoryHeading(
-                    context,
-                    title: '2. Variable Resistors',
-                    subtitle: 'Resistors whose ohmic value can be manually or mechanically adjusted.',
-                    badgeColor: const Color(0xFFA78BFA),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildResponsiveGrid(
-                    context,
-                    children: [
-                      _buildResistorCard(
-                        context,
-                        name: 'Potentiometer (Pot)',
-                        icon: Icons.tune_rounded,
-                        accentColor: const Color(0xFFA78BFA),
-                        whatItDoes:
-                            'A 3-terminal variable resistor primarily configured as an adjustable voltage divider.',
-                        howItWorks:
-                            'A sliding contact (wiper) mechanically rotates or slides across a fixed resistive track, tapping off an adjustable fraction of the total voltage between terminals 1 and 3.',
-                        application:
-                            'Rotary volume controls in stereos, game controller joystick position sensing, and laboratory bench power supply calibration.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Rheostat',
-                        icon: Icons.speed_rounded,
-                        accentColor: const Color(0xFF2DD4BF),
-                        whatItDoes:
-                            'A 2-terminal variable resistor designed to directly control and regulate electric current flow.',
-                        howItWorks:
-                            'Connected in series with the load. Turning the wiper varies the effective length of resistive wire in the circuit path, directly changing circuit impedance (I = V / R).',
-                        application:
-                            'Incandescent light dimmer controls, laboratory physics experiments, and electric motor speed regulation.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Preset / Trimmer (Trimpot)',
-                        icon: Icons.build_circle_rounded,
-                        accentColor: const Color(0xFF60A5FA),
-                        whatItDoes:
-                            'Miniature adjustable resistor mounted directly onto circuit boards for factory or one-time calibration.',
-                        howItWorks:
-                            'Features a tiny internal rotary screw or spindle adjusted using a precision screwdriver. It is set during manufacturing/tuning and rarely touched again by users.',
-                        application:
-                            'Calibrating sensor sensitivity, tuning oscillator frequencies, and trimming operational amplifier offset voltages.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+                    // CATEGORY 2: VARIABLE RESISTORS
+                    _buildCategoryHeading(
+                      context,
+                      title: '2. Variable Resistors',
+                      subtitle:
+                          'Resistors whose ohmic resistance can be mechanically or manually adjusted.',
+                      badgeColor: const Color(0xFFA855F7),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildResponsiveGrid(
+                      context,
+                      children: [
+                        _buildResistorCard(
+                          context,
+                          name: 'Potentiometer (Pot)',
+                          modelType: Resistor3DType.potentiometer,
+                          icon: Icons.tune_rounded,
+                          accentColor: const Color(0xFFA855F7),
+                          whatItDoes:
+                              'A 3-terminal variable resistor primarily configured as an adjustable voltage divider.',
+                          howItWorks:
+                              'A sliding contact (wiper) mechanically rotates across a fixed resistive track, tapping off an adjustable fraction of the total voltage between terminals 1 and 3.',
+                          application:
+                              'Rotary volume controls in stereos, game controller joystick position sensing, and laboratory power supply calibration.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Rheostat',
+                          modelType: Resistor3DType.rheostat,
+                          icon: Icons.speed_rounded,
+                          accentColor: const Color(0xFF2DD4BF),
+                          whatItDoes:
+                              'A 2-terminal variable resistor designed to directly control and regulate electric current flow.',
+                          howItWorks:
+                              'Connected in series with the load. Turning the wiper varies the effective length of resistive wire in the circuit path, changing circuit current (I = V / R).',
+                          application:
+                              'Incandescent light dimmer controls, laboratory physics experiments, and electric motor speed regulation.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Preset / Trimmer (Trimpot)',
+                          modelType: Resistor3DType.trimmer,
+                          icon: Icons.build_circle_rounded,
+                          accentColor: const Color(0xFF60A5FA),
+                          whatItDoes:
+                              'Miniature adjustable resistor mounted directly onto circuit boards for factory or one-time calibration.',
+                          howItWorks:
+                              'Features a tiny internal rotary screw adjusted using a precision screwdriver. It is set during manufacturing/tuning and rarely touched again by users.',
+                          application:
+                              'Calibrating sensor sensitivity, tuning oscillator frequencies, and trimming operational amplifier offset voltages.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
 
-                  // CATEGORY 3: SPECIAL RESISTORS
-                  _buildCategoryHeading(
-                    context,
-                    title: '3. Special-Purpose Resistors',
-                    subtitle: 'Non-linear resistors whose resistance changes in response to physical quantities.',
-                    badgeColor: const Color(0xFFF97316),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildResponsiveGrid(
-                    context,
-                    children: [
-                      _buildResistorCard(
-                        context,
-                        name: 'LDR (Light Dependent Resistor)',
-                        icon: Icons.light_mode_rounded,
-                        accentColor: const Color(0xFFFBBF24),
-                        whatItDoes:
-                            'A light-sensitive resistor whose resistance decreases significantly as light intensity increases.',
-                        howItWorks:
-                            'Fabricated from a Cadmium Sulfide (CdS) semiconductor. Incident photons energize bound valence electrons into the conduction band, increasing free charge carriers and conductivity.',
-                        application:
-                            'Automatic street lights, camera light meters, solar tracking systems, and clock alarm dimmers.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Thermistor (NTC / PTC)',
-                        icon: Icons.device_thermostat_rounded,
-                        accentColor: const Color(0xFFFB7185),
-                        whatItDoes:
-                            'A temperature-sensitive resistor whose resistance varies predictably with thermal changes.',
-                        howItWorks:
-                            'In NTC (Negative Temperature Coefficient), heat creates extra free electron carriers, reducing resistance. In PTC, resistance spikes sharply at a critical Curie temperature.',
-                        application:
-                            'Digital thermometers, 3D printer hotend temp monitors, Li-ion battery overheat protection, and inrush current limiters.',
-                      ),
-                      _buildResistorCard(
-                        context,
-                        name: 'Varistor (VDR / MOV)',
-                        icon: Icons.bolt_rounded,
-                        accentColor: const Color(0xFF818CF8),
-                        whatItDoes:
-                            'A voltage-dependent non-linear resistor used for transient surge and lightning spike protection.',
-                        howItWorks:
-                            'Operates as an open circuit (extremely high resistance) at normal operating voltages. When high voltage spikes occur, it abruptly clamps down to low resistance, safely shunting surge energy to ground.',
-                        application:
-                            'Surge protector power strips, AC mains input protection modules, and automotive electronics.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                    // CATEGORY 3: SPECIAL RESISTORS
+                    _buildCategoryHeading(
+                      context,
+                      title: '3. Special-Purpose Resistors',
+                      subtitle:
+                          'Non-linear resistors whose resistance changes dynamically with external physical stimuli.',
+                      badgeColor: const Color(0xFFF97316),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildResponsiveGrid(
+                      context,
+                      children: [
+                        _buildResistorCard(
+                          context,
+                          name: 'LDR (Light Dependent Resistor)',
+                          modelType: Resistor3DType.ldr,
+                          icon: Icons.light_mode_rounded,
+                          accentColor: const Color(0xFFFBBF24),
+                          whatItDoes:
+                              'A light-sensitive resistor whose resistance decreases significantly as ambient light intensity increases.',
+                          howItWorks:
+                              'Fabricated from a Cadmium Sulfide (CdS) semiconductor. Incident photons energize bound valence electrons into the conduction band, increasing free charge carriers.',
+                          application:
+                              'Automatic street lights, camera light meters, solar tracking systems, and clock alarm dimmers.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Thermistor (NTC / PTC)',
+                          modelType: Resistor3DType.thermistor,
+                          icon: Icons.device_thermostat_rounded,
+                          accentColor: const Color(0xFFFB7185),
+                          whatItDoes:
+                              'A temperature-sensitive resistor whose resistance varies predictably with thermal changes.',
+                          howItWorks:
+                              'In NTC (Negative Temperature Coefficient), heat creates extra free electron carriers, reducing resistance. In PTC, resistance spikes sharply at a critical Curie temperature.',
+                          application:
+                              'Digital thermometers, 3D printer hotend temp monitors, Li-ion battery overheat protection, and inrush current limiters.',
+                        ),
+                        _buildResistorCard(
+                          context,
+                          name: 'Varistor (VDR / MOV)',
+                          modelType: Resistor3DType.varistor,
+                          icon: Icons.bolt_rounded,
+                          accentColor: const Color(0xFF818CF8),
+                          whatItDoes:
+                              'A voltage-dependent non-linear resistor used for transient surge and lightning spike protection.',
+                          howItWorks:
+                              'Operates as an open circuit (high resistance) at normal operating voltages. When high voltage spikes occur, it abruptly clamps down to low resistance, safely shunting surge energy.',
+                          application:
+                              'Surge protector power strips, AC mains input protection modules, and automotive electronics.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
             ),
           ),
@@ -199,25 +246,28 @@ class TypesScreen extends StatelessWidget {
     );
   }
 
-  /// Banner at the top of the screen.
+  /// Banner at the top of the screen in visionOS frosted glass styling.
   Widget _buildHeaderBanner(BuildContext context) {
-    return Container(
+    return GlassContainer(
+      borderRadius: 20,
+      glowColor: const Color(0xFF00E5FF),
       padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101726),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFA78BFA).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFA78BFA).withValues(alpha: 0.3)),
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.40),
+              ),
             ),
-            child: const Icon(Icons.category_rounded, color: Color(0xFFA78BFA), size: 28),
+            child: const Icon(
+              Icons.view_in_ar_rounded,
+              color: Color(0xFF00E5FF),
+              size: 28,
+            ),
           ),
           const SizedBox(width: 16),
           const Expanded(
@@ -225,16 +275,17 @@ class TypesScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Types of Resistors Guide',
+                  '3D Resistor Taxonomy & Models',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFFF8FAFC),
+                    letterSpacing: -0.2,
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'A quick guide to fixed, variable, and special resistors used in the lab.',
+                  'Rotate and inspect 3D CAD structural models of fixed, variable, and special resistors.',
                   style: TextStyle(
                     fontSize: 13,
                     color: Color(0xFF94A3B8),
@@ -249,7 +300,7 @@ class TypesScreen extends StatelessWidget {
     );
   }
 
-  /// Category section heading.
+  /// Category section heading with futuristic neon accent.
   Widget _buildCategoryHeading(
     BuildContext context, {
     required String title,
@@ -263,27 +314,37 @@ class TypesScreen extends StatelessWidget {
           children: [
             Container(
               width: 4,
-              height: 18,
+              height: 20,
               decoration: BoxDecoration(
                 color: badgeColor,
                 borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: badgeColor.withValues(alpha: 0.8),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFFF8FAFC),
+                letterSpacing: 0.2,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+        const SizedBox(height: 5),
+        Padding(
+          padding: const EdgeInsets.only(left: 14.0),
+          child: Text(
+            subtitle,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+          ),
         ),
       ],
     );
@@ -302,12 +363,12 @@ class TypesScreen extends StatelessWidget {
 
             rows.add(
               Padding(
-                padding: const EdgeInsets.only(bottom: 14.0),
+                padding: const EdgeInsets.only(bottom: 16.0),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: card1),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 16),
                     if (card2 != null)
                       Expanded(child: card2)
                     else
@@ -323,7 +384,7 @@ class TypesScreen extends StatelessWidget {
         return Column(
           children: children
               .map((c) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14.0),
+                    padding: const EdgeInsets.only(bottom: 16.0),
                     child: c,
                   ))
               .toList(),
@@ -332,82 +393,87 @@ class TypesScreen extends StatelessWidget {
     );
   }
 
-  /// Detailed Card showing: Name, What it does, How it works, Application.
+  /// Detailed Card showing: Name, Interactive 3D Model, What it does, How it works, Application.
   Widget _buildResistorCard(
     BuildContext context, {
     required String name,
+    required Resistor3DType modelType,
     required IconData icon,
     required Color accentColor,
     required String whatItDoes,
     required String howItWorks,
     required String application,
   }) {
-    return Card(
-      elevation: 0,
-      color: const Color(0xFF101726),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Row: Icon + Name
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: accentColor.withValues(alpha: 0.3)),
-                  ),
-                  child: Icon(icon, color: accentColor, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFF8FAFC),
-                      height: 1.25,
-                    ),
+    return GlassContainer(
+      borderRadius: 18,
+      padding: const EdgeInsets.all(18.0),
+      glowColor: accentColor.withValues(alpha: 0.15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Icon + Name
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: accentColor.withValues(alpha: 0.35),
                   ),
                 ),
-              ],
-            ),
-            const Divider(height: 20, color: Color(0xFF1E293B)),
+                child: Icon(icon, color: accentColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFF8FAFC),
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
 
-            // 1. What it does
-            _buildDetailRow(
-              tag: 'What it does',
-              tagColor: const Color(0xFF38BDF8),
-              content: whatItDoes,
-            ),
-            const SizedBox(height: 10),
+          // Interactive 3D Model Viewport
+          Resistor3DViewer(
+            type: modelType,
+            height: 150,
+            title: name,
+          ),
+          const SizedBox(height: 14),
 
-            // 2. How it works
-            _buildDetailRow(
-              tag: 'How it works',
-              tagColor: const Color(0xFF2DD4BF),
-              content: howItWorks,
-            ),
-            const SizedBox(height: 10),
+          // 1. What it does
+          _buildDetailRow(
+            tag: 'Function',
+            tagColor: const Color(0xFF00E5FF),
+            content: whatItDoes,
+          ),
+          const SizedBox(height: 10),
 
-            // 3. Common Application
-            _buildDetailRow(
-              tag: 'Lab Application',
-              tagColor: const Color(0xFFA78BFA),
-              content: application,
-            ),
-          ],
-        ),
+          // 2. How it works
+          _buildDetailRow(
+            tag: 'Internal Structure',
+            tagColor: const Color(0xFF2DD4BF),
+            content: howItWorks,
+          ),
+          const SizedBox(height: 10),
+
+          // 3. Common Application
+          _buildDetailRow(
+            tag: 'Lab Application',
+            tagColor: const Color(0xFFA855F7),
+            content: application,
+          ),
+        ],
       ),
     );
   }
@@ -421,11 +487,11 @@ class TypesScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: tagColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: tagColor.withValues(alpha: 0.25)),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: tagColor.withValues(alpha: 0.30)),
           ),
           child: Text(
             tag,
