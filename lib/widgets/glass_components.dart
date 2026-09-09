@@ -67,11 +67,8 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
         // 1. Viewport-Pinned Static Animated Smooth Sine Waves Radiating From Middle (Continuous active canvas)
         Positioned.fill(
           child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) => CustomPaint(
-                painter: _SiriRadiatingWavesPainter(_controller.value),
-              ),
+            child: CustomPaint(
+              painter: _SiriRadiatingWavesPainter(animation: _controller),
             ),
           ),
         ),
@@ -100,9 +97,17 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
 /// with heavy multi-layer Gaussian blur bloom and organic harmonic undulation.
 /// The center blends seamlessly with the waves rather than looking like an obvious concentrated dot.
 class _SiriRadiatingWavesPainter extends CustomPainter {
-  final double progress;
+  final Animation<double>? _animation;
+  final double? _staticProgress;
 
-  _SiriRadiatingWavesPainter(this.progress);
+  _SiriRadiatingWavesPainter({
+    Animation<double>? animation,
+    double? progress,
+  })  : _animation = animation,
+        _staticProgress = progress,
+        super(repaint: animation);
+
+  double get progress => _animation?.value ?? _staticProgress ?? 0.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -115,21 +120,39 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
     final t = progress * 2.0 * math.pi;
 
     // 2. Luminous Ambient Chromatic Aura (Brighter & richer bloom)
-    final ambientAuraPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF8B5CF6).withValues(alpha: 0.34), // Rich Violet
-          const Color(0xFF00E5FF).withValues(alpha: 0.30), // Electric Cyan
-          const Color(0xFFEC4899).withValues(alpha: 0.20), // Radiant Magenta
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.38, 0.68, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60.64); // another 5% more blur
-    canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
+    if (kIsWeb) {
+      // Direct GPU fragment-shaded multi-stop radial gradient without CPU/WASM software blur
+      final ambientAuraPaint = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF8B5CF6).withValues(alpha: 0.34), // Rich Violet
+            const Color(0xFF8B5CF6).withValues(alpha: 0.30),
+            const Color(0xFF00E5FF).withValues(alpha: 0.28), // Electric Cyan
+            const Color(0xFF00E5FF).withValues(alpha: 0.20),
+            const Color(0xFFEC4899).withValues(alpha: 0.16), // Radiant Magenta
+            const Color(0xFFEC4899).withValues(alpha: 0.06),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.18, 0.36, 0.54, 0.72, 0.88, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90));
+      canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
+    } else {
+      final ambientAuraPaint = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF8B5CF6).withValues(alpha: 0.34), // Rich Violet
+            const Color(0xFF00E5FF).withValues(alpha: 0.30), // Electric Cyan
+            const Color(0xFFEC4899).withValues(alpha: 0.20), // Radiant Magenta
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.38, 0.68, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60.64); // another 5% more blur
+      canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
+    }
 
     // 3. Smooth Concentric Sine Waves Radiating Outward from Middle (Like Siri)
-    // 6 radiating harmonic wave rings with heavy Gaussian blur and bright neon presence
+    // 6 radiating harmonic wave rings with bright neon presence
     final wavePalette = [
       const Color(0xFF00E5FF), // Electric Cyan
       const Color(0xFFA855F7), // Radiant Violet
@@ -140,6 +163,8 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
     ];
 
     const numRadiatingRings = 6;
+    final steps = kIsWeb ? 72 : 96;
+
     for (int k = 0; k < numRadiatingRings; k++) {
       // Phase progresses outward continuously [0.0 .. 1.0]
       final ringProgress = (progress + k / numRadiatingRings) % 1.0;
@@ -153,7 +178,6 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
 
       final color = wavePalette[k % wavePalette.length];
       final path = Path();
-      const steps = 96;
 
       for (int i = 0; i <= steps; i++) {
         final theta = (i / steps) * 2.0 * math.pi;
@@ -175,38 +199,71 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       }
       path.close();
 
-      // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow
-      final blurAmount = (38.0 + 20.0 * ringProgress) * 1.1025; // another 5% more blur
-      final waveStrokePaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 22.0 + 14.0 * ringProgress
-        ..color = color.withValues(alpha: alpha * 0.80)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurAmount);
+      if (kIsWeb) {
+        // High-performance hardware-accelerated multi-pass glow for WebGL / CanvasKit.
+        // Replaces 12 expensive software/FBO Gaussian blur passes with direct GPU stroke passes:
+        
+        // 1. Soft diffused outer glow aura
+        final outerGlowPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 36.0 + 18.0 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.10);
+        canvas.drawPath(path, outerGlowPaint);
 
-      canvas.drawPath(path, waveStrokePaint);
+        // 2. Medium ambient neon bloom
+        final midOuterPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 20.0 + 10.0 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.22);
+        canvas.drawPath(path, midOuterPaint);
 
-      // Vivid chromatic inner glow
-      final midGlowPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 6.0 + 4.0 * ringProgress
-        ..color = color.withValues(alpha: alpha * 0.90)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11.0); // another 5% more blur
+        // 3. Focused chromatic inner glow
+        final midGlowPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 8.0 + 4.0 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.50);
+        canvas.drawPath(path, midGlowPaint);
 
-      canvas.drawPath(path, midGlowPaint);
+        // 4. Bright harmonic core line
+        final coreLinePaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..color = Colors.white.withValues(alpha: alpha * 0.75);
+        canvas.drawPath(path, coreLinePaint);
+      } else {
+        // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow on Native Mobile (Metal / Vulkan / Impeller)
+        final blurAmount = (38.0 + 20.0 * ringProgress) * 1.1025; // another 5% more blur
+        final waveStrokePaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 22.0 + 14.0 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.80)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurAmount);
 
-      // Bright delicate harmonic core line inside the heavy blur
-      final coreLinePaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
-        ..color = Colors.white.withValues(alpha: alpha * 0.70);
+        canvas.drawPath(path, waveStrokePaint);
 
-      canvas.drawPath(path, coreLinePaint);
+        // Vivid chromatic inner glow
+        final midGlowPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6.0 + 4.0 * ringProgress
+          ..color = color.withValues(alpha: alpha * 0.90)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11.0); // another 5% more blur
+
+        canvas.drawPath(path, midGlowPaint);
+
+        // Bright delicate harmonic core line inside the heavy blur
+        final coreLinePaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..color = Colors.white.withValues(alpha: alpha * 0.70);
+
+        canvas.drawPath(path, coreLinePaint);
+      }
     }
   }
 
   @override
   bool shouldRepaint(covariant _SiriRadiatingWavesPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      _animation == null && oldDelegate.progress != progress;
 }
 
 class _TechGridPainter extends CustomPainter {
