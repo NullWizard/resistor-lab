@@ -93,7 +93,7 @@ class HomeScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            LiquidGlassPageRoute(
                               builder: (context) => const LearnScreen(),
                             ),
                           );
@@ -111,7 +111,7 @@ class HomeScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            LiquidGlassPageRoute(
                               builder: (context) => const CalculatorScreen(),
                             ),
                           );
@@ -129,7 +129,7 @@ class HomeScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            LiquidGlassPageRoute(
                               builder: (context) => const TypesScreen(),
                             ),
                           );
@@ -147,7 +147,7 @@ class HomeScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            LiquidGlassPageRoute(
                               builder: (context) => const QuizScreen(),
                             ),
                           );
@@ -165,7 +165,7 @@ class HomeScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            LiquidGlassPageRoute(
                               builder: (context) => const ScanResistorScreen(),
                             ),
                           );

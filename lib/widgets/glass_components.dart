@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// VisionOS & Apple Intelligence inspired Liquid Glass background featuring a dark ambient canvas
@@ -13,6 +14,40 @@ import 'package:google_fonts/google_fonts.dart';
 ///
 /// Optimized for 60 FPS performance: the animation controller only rebuilds the background
 /// CustomPaint canvas and NEVER triggers rebuilds of the foreground widget tree.
+/// Global animation coordinator so that background waves NEVER restart when switching screens.
+class _GlobalBackgroundAnimation {
+  static final _GlobalBackgroundAnimation instance = _GlobalBackgroundAnimation._();
+  _GlobalBackgroundAnimation._();
+
+  final ValueNotifier<double> progress = ValueNotifier<double>(0.0);
+  Ticker? _ticker;
+  int _subscribers = 0;
+
+  void subscribe(TickerProvider vsync) {
+    _subscribers++;
+    if (_ticker == null) {
+      final isTest =
+          WidgetsBinding.instance.runtimeType.toString().contains('Test');
+      if (!isTest) {
+        _ticker = vsync.createTicker((elapsed) {
+          final ms = elapsed.inMilliseconds;
+          progress.value = (ms % 10000) / 10000.0;
+        })..start();
+      }
+    }
+  }
+
+  void unsubscribe() {
+    _subscribers--;
+    if (_subscribers <= 0) {
+      _ticker?.stop();
+      _ticker?.dispose();
+      _ticker = null;
+      _subscribers = 0;
+    }
+  }
+}
+
 class FuturisticBackground extends StatefulWidget {
   final Widget child;
 
@@ -24,26 +59,15 @@ class FuturisticBackground extends StatefulWidget {
 
 class _FuturisticBackgroundState extends State<FuturisticBackground>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    );
-    // Avoid scheduling infinite animation frames in widget tests
-    final isTest =
-        WidgetsBinding.instance.runtimeType.toString().contains('Test');
-    if (!isTest) {
-      _controller.repeat();
-    }
+    _GlobalBackgroundAnimation.instance.subscribe(this);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _GlobalBackgroundAnimation.instance.unsubscribe();
     super.dispose();
   }
 
@@ -51,13 +75,13 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Viewport-Pinned Static Animated Smooth Sine Waves Radiating From Middle (Zero-lag isolated canvas)
+        // 1. Viewport-Pinned Static Animated Smooth Sine Waves Radiating From Middle (Continuous synchronized canvas)
         Positioned.fill(
           child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) => CustomPaint(
-                painter: _SiriRadiatingWavesPainter(_controller.value),
+            child: ValueListenableBuilder<double>(
+              valueListenable: _GlobalBackgroundAnimation.instance.progress,
+              builder: (context, progress, _) => CustomPaint(
+                painter: _SiriRadiatingWavesPainter(progress),
               ),
             ),
           ),
@@ -112,7 +136,7 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
         ],
         stops: const [0.0, 0.38, 0.68, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.90))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 55.0);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 57.75); // 5% more blur
     canvas.drawCircle(center, maxRadius * 0.90, ambientAuraPaint);
 
     // 3. Smooth Concentric Sine Waves Radiating Outward from Middle (Like Siri)
@@ -163,7 +187,7 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       path.close();
 
       // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow
-      final blurAmount = 38.0 + 20.0 * ringProgress;
+      final blurAmount = (38.0 + 20.0 * ringProgress) * 1.05; // 5% more blur
       final waveStrokePaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 22.0 + 14.0 * ringProgress
@@ -177,7 +201,7 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 6.0 + 4.0 * ringProgress
         ..color = color.withValues(alpha: alpha * 0.90)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.0);
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.5); // 5% more blur
 
       canvas.drawPath(path, midGlowPaint);
 
@@ -770,4 +794,30 @@ class GlassButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Smooth visionOS & Apple Intelligence inspired fluid transition for sub-screens.
+/// Avoids slide-stutter and lets the persistent background remain seamless.
+class LiquidGlassPageRoute<T> extends PageRouteBuilder<T> {
+  final WidgetBuilder builder;
+
+  LiquidGlassPageRoute({required this.builder, super.settings})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              builder(context),
+          transitionsBuilder:
+              (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 260),
+          reverseTransitionDuration: const Duration(milliseconds: 220),
+        );
 }

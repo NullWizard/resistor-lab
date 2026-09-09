@@ -844,40 +844,91 @@ class LearnScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
 
-              // Visual Gauge Readout Labels
+              // Visual Gauge Readout Labels (Strictly Aligned & Contained)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '950 Ω (-5% Min)',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF6EE7B7),
+                  // Left: Min Limit
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '950 Ω',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF6EE7B7),
+                          ),
+                        ),
+                        Text(
+                          'Min (-5%)',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.20),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                    ),
-                    child: Text(
-                      '1,000 Ω (Nominal)',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFFF8FAFC),
-                      ),
+
+                  // Center: Nominal Target Badge
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
+                          ),
+                          child: Text(
+                            '1,000 Ω',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Nominal Target',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF34D399),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Text(
-                    '1,050 Ω (+5% Max)',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF6EE7B7),
+
+                  // Right: Max Limit
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '1,050 Ω',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF6EE7B7),
+                          ),
+                        ),
+                        Text(
+                          'Max (+5%)',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

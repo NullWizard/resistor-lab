@@ -152,20 +152,29 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ..._buildDynamicBandDropdowns(),
                   const SizedBox(height: 18),
 
-                  // Reset Action Button
-                  OutlinedButton.icon(
-                    onPressed: _resetCalculator,
-                    icon: const Icon(Icons.restart_alt_rounded),
-                    label: Text(
-                      _bandCount == 4
-                          ? 'Reset to Default (1.7 kΩ)'
-                          : 'Reset to Default (10 kΩ)',
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  // Reset Action Button (Highlighted Liquid Glass Box)
+                  GlassContainer(
+                    onTap: _resetCalculator,
+                    borderRadius: 16,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    tintColor: const Color(0xFF1E293B).withValues(alpha: 0.55),
+                    glowColor: const Color(0xFF00E5FF),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.restart_alt_rounded, color: Color(0xFF00E5FF), size: 20),
+                        const SizedBox(width: 10),
+                        Text(
+                          _bandCount == 4
+                              ? 'Reset to Default (1.7 kΩ)'
+                              : 'Reset to Default (10 kΩ)',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFF8FAFC),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -184,43 +193,66 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Number of Bands',
-          style: theme.textTheme.titleSmall?.copyWith(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
+            fontSize: 13,
+            color: Color(0xFFBAE6FD),
+            letterSpacing: 0.2,
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment<int>(value: 4, label: Text('4')),
-              ButtonSegment<int>(value: 5, label: Text('5')),
-              ButtonSegment<int>(value: 6, label: Text('6')),
-            ],
-            selected: {_bandCount},
-            onSelectionChanged: (newSelection) {
-              setState(() {
-                final prev = _bandCount;
-                _bandCount = newSelection.first.clamp(4, 6);
-                if (prev == 4 && _bandCount >= 5) {
-                  _band2Index = 0; // Black
-                  _band3DigitIndex = 0; // Black
-                  _toleranceIndex = 0; // Brown (±1%)
-                } else if (prev >= 5 && _bandCount == 4) {
-                  _band2Index = 7; // Violet
-                  _toleranceIndex = 2; // Gold (±5%)
-                }
-                _band1Index = _band1Index.clamp(0, _digitColors.length - 1);
-                _band2Index = _band2Index.clamp(0, _digitColors.length - 1);
-                _band3DigitIndex = _band3DigitIndex.clamp(0, _digitColors.length - 1);
-                _multiplierIndex = _multiplierIndex.clamp(0, _multiplierColors.length - 1);
-                _toleranceIndex = _toleranceIndex.clamp(0, _toleranceColors.length - 1);
-                _tempCoIndex = _tempCoIndex.clamp(0, _tempCoColors.length - 1);
-              });
-            },
+        GlassContainer(
+          borderRadius: 18,
+          padding: const EdgeInsets.all(4),
+          tintColor: const Color(0xFF1E293B).withValues(alpha: 0.55),
+          glowColor: const Color(0xFF00E5FF),
+          child: SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<int>(
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFF00E5FF);
+                  }
+                  return Colors.transparent;
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFF080D1A);
+                  }
+                  return const Color(0xFFF8FAFC);
+                }),
+                side: WidgetStateProperty.all(BorderSide.none),
+              ),
+              segments: const [
+                ButtonSegment<int>(value: 4, label: Text('4', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5))),
+                ButtonSegment<int>(value: 5, label: Text('5', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5))),
+                ButtonSegment<int>(value: 6, label: Text('6', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5))),
+              ],
+              selected: {_bandCount},
+              onSelectionChanged: (newSelection) {
+                setState(() {
+                  final prev = _bandCount;
+                  _bandCount = newSelection.first.clamp(4, 6);
+                  if (prev == 4 && _bandCount >= 5) {
+                    _band2Index = 0; // Black
+                    _band3DigitIndex = 0; // Black
+                    _toleranceIndex = 0; // Brown (±1%)
+                  } else if (prev >= 5 && _bandCount == 4) {
+                    _band2Index = 7; // Violet
+                    _toleranceIndex = 2; // Gold (±5%)
+                  }
+                  _band1Index = _band1Index.clamp(0, _digitColors.length - 1);
+                  _band2Index = _band2Index.clamp(0, _digitColors.length - 1);
+                  _band3DigitIndex = _band3DigitIndex.clamp(0, _digitColors.length - 1);
+                  _multiplierIndex = _multiplierIndex.clamp(0, _multiplierColors.length - 1);
+                  _toleranceIndex = _toleranceIndex.clamp(0, _toleranceColors.length - 1);
+                  _tempCoIndex = _tempCoIndex.clamp(0, _tempCoColors.length - 1);
+                });
+              },
+            ),
           ),
         ),
       ],
@@ -706,166 +738,225 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
-  /// Dropdown for Significant Digits (0 - 9).
+  /// Dropdown for Significant Digits (0 - 9) wrapped in Highlighted Liquid Glass.
   Widget _buildDigitDropdown({
     required String label,
     required int value,
     required ValueChanged<int?> onChanged,
   }) {
     final safeValue = (value >= 0 && value < _digitColors.length) ? value : 0;
-    return DropdownButtonFormField<int>(
-      key: ValueKey('digit-$label-$safeValue'),
-      initialValue: safeValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+    return GlassContainer(
+      borderRadius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      tintColor: const Color(0xFF1E293B).withValues(alpha: 0.55),
+      glowColor: const Color(0xFF00E5FF),
+      borderWidth: 1.2,
+      child: DropdownButtonFormField<int>(
+        key: ValueKey('digit-$label-$safeValue'),
+        initialValue: safeValue,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF0F172A),
+        style: const TextStyle(
+          color: Color(0xFFF8FAFC),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-      ),
-      items: _digitColors.map((digit) {
-        return DropdownMenuItem<int>(
-          value: digit.value,
-          child: Row(
-            children: [
-              _buildColorSwatch(digit.color),
-              const SizedBox(width: 12),
-              Text('${digit.name} (${digit.value})'),
-            ],
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: Color(0xFFBAE6FD),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
           ),
-        );
-      }).toList(),
-      onChanged: onChanged,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 6),
+        ),
+        items: _digitColors.map((digit) {
+          return DropdownMenuItem<int>(
+            value: digit.value,
+            child: Row(
+              children: [
+                _buildColorSwatch(digit.color),
+                const SizedBox(width: 12),
+                Text('${digit.name} (${digit.value})'),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: onChanged,
+      ),
     );
   }
 
-  /// Dropdown for Multipliers.
+  /// Dropdown for Multipliers wrapped in Highlighted Liquid Glass.
   Widget _buildMultiplierDropdown({
     required String label,
     required int value,
     required ValueChanged<int?> onChanged,
   }) {
     final safeValue = (value >= 0 && value < _multiplierColors.length) ? value : 0;
-    return DropdownButtonFormField<int>(
-      key: ValueKey('multiplier-$label-$safeValue'),
-      initialValue: safeValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+    return GlassContainer(
+      borderRadius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      tintColor: const Color(0xFF1E293B).withValues(alpha: 0.55),
+      glowColor: const Color(0xFF00E5FF),
+      borderWidth: 1.2,
+      child: DropdownButtonFormField<int>(
+        key: ValueKey('multiplier-$label-$safeValue'),
+        initialValue: safeValue,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF0F172A),
+        style: const TextStyle(
+          color: Color(0xFFF8FAFC),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-      ),
-      items: List.generate(_multiplierColors.length, (index) {
-        final mult = _multiplierColors[index];
-        final String multLabel;
-        if (mult.multiplier >= 1) {
-          multLabel = '×${ResistorScannerService.formatResistance(mult.multiplier)}';
-        } else if (mult.multiplier == 0.1) {
-          multLabel = '×0.1';
-        } else {
-          multLabel = '×0.01';
-        }
-        return DropdownMenuItem<int>(
-          value: index,
-          child: Row(
-            children: [
-              _buildColorSwatch(mult.color),
-              const SizedBox(width: 12),
-              Text('${mult.name} ($multLabel)'),
-            ],
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: Color(0xFFBAE6FD),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
           ),
-        );
-      }),
-      onChanged: onChanged,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 6),
+        ),
+        items: List.generate(_multiplierColors.length, (index) {
+          final mult = _multiplierColors[index];
+          final String multLabel;
+          if (mult.multiplier >= 1) {
+            multLabel = '×${ResistorScannerService.formatResistance(mult.multiplier)}';
+          } else if (mult.multiplier == 0.1) {
+            multLabel = '×0.1';
+          } else {
+            multLabel = '×0.01';
+          }
+          return DropdownMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                _buildColorSwatch(mult.color),
+                const SizedBox(width: 12),
+                Text('${mult.name} ($multLabel)'),
+              ],
+            ),
+          );
+        }),
+        onChanged: onChanged,
+      ),
     );
   }
 
-  /// Dropdown for Tolerance.
+  /// Dropdown for Tolerance wrapped in Highlighted Liquid Glass.
   Widget _buildToleranceDropdown({
     required String label,
     required int value,
     required ValueChanged<int?> onChanged,
   }) {
     final safeValue = (value >= 0 && value < _toleranceColors.length) ? value : 0;
-    return DropdownButtonFormField<int>(
-      key: ValueKey('tolerance-$label-$safeValue'),
-      initialValue: safeValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+    return GlassContainer(
+      borderRadius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      tintColor: const Color(0xFF1E293B).withValues(alpha: 0.55),
+      glowColor: const Color(0xFF00E5FF),
+      borderWidth: 1.2,
+      child: DropdownButtonFormField<int>(
+        key: ValueKey('tolerance-$label-$safeValue'),
+        initialValue: safeValue,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF0F172A),
+        style: const TextStyle(
+          color: Color(0xFFF8FAFC),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-      ),
-      items: List.generate(_toleranceColors.length, (index) {
-        final tol = _toleranceColors[index];
-        return DropdownMenuItem<int>(
-          value: index,
-          child: Row(
-            children: [
-              _buildColorSwatch(tol.color),
-              const SizedBox(width: 12),
-              Text('${tol.name} (±${tol.tolerance}%)'),
-            ],
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: Color(0xFFBAE6FD),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
           ),
-        );
-      }),
-      onChanged: onChanged,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 6),
+        ),
+        items: List.generate(_toleranceColors.length, (index) {
+          final tol = _toleranceColors[index];
+          return DropdownMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                _buildColorSwatch(tol.color),
+                const SizedBox(width: 12),
+                Text('${tol.name} (±${tol.tolerance}%)'),
+              ],
+            ),
+          );
+        }),
+        onChanged: onChanged,
+      ),
     );
   }
 
-  /// Dropdown for Temperature Coefficient (6th Band).
+  /// Dropdown for Temperature Coefficient (6th Band) wrapped in Highlighted Liquid Glass.
   Widget _buildTempCoDropdown({
     required String label,
     required int value,
     required ValueChanged<int?> onChanged,
   }) {
     final safeValue = (value >= 0 && value < _tempCoColors.length) ? value : 0;
-    return DropdownButtonFormField<int>(
-      key: ValueKey('tempCo-$label-$safeValue'),
-      initialValue: safeValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+    return GlassContainer(
+      borderRadius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      tintColor: const Color(0xFF1E293B).withValues(alpha: 0.55),
+      glowColor: const Color(0xFF00E5FF),
+      borderWidth: 1.2,
+      child: DropdownButtonFormField<int>(
+        key: ValueKey('tempCo-$label-$safeValue'),
+        initialValue: safeValue,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF0F172A),
+        style: const TextStyle(
+          color: Color(0xFFF8FAFC),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-      ),
-      items: List.generate(_tempCoColors.length, (index) {
-        final tc = _tempCoColors[index];
-        return DropdownMenuItem<int>(
-          value: index,
-          child: Row(
-            children: [
-              _buildColorSwatch(tc.color),
-              const SizedBox(width: 12),
-              Text('${tc.name} (${tc.value} ppm/K)'),
-            ],
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: Color(0xFFBAE6FD),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
           ),
-        );
-      }),
-      onChanged: onChanged,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 6),
+        ),
+        items: List.generate(_tempCoColors.length, (index) {
+          final tc = _tempCoColors[index];
+          return DropdownMenuItem<int>(
+            value: index,
+            child: Row(
+              children: [
+                _buildColorSwatch(tc.color),
+                const SizedBox(width: 12),
+                Text('${tc.name} (${tc.value} ppm/K)'),
+              ],
+            ),
+          );
+        }),
+        onChanged: onChanged,
+      ),
     );
   }
 
-  /// Color circle swatch indicator for dropdown items.
   Widget _buildColorSwatch(Color color) {
     return Container(
       width: 18,
