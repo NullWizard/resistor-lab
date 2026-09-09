@@ -505,9 +505,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: const Color(0xFF080D1A),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: const Color(0xFF1E293B)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -530,6 +530,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
+              color: Color(0xFFCBD5E1),
             ),
           ),
         ],
@@ -617,13 +618,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     label: 'Minimum Resistance',
                     readableVal: calc.readableMin,
                     rawOhms: _formatRawOhms(calc.minOhms),
-                    color: Colors.blue.shade800,
+                    color: const Color(0xFF38BDF8),
                   ),
                 ),
                 Container(
                   width: 1,
                   height: 38,
-                  color: Colors.grey.shade300,
+                  color: const Color(0xFF1E293B),
                 ),
                 Expanded(
                   child: _buildLimitColumn(
@@ -631,7 +632,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     label: 'Maximum Resistance',
                     readableVal: calc.readableMax,
                     rawOhms: _formatRawOhms(calc.maxOhms),
-                    color: Colors.deepPurple.shade800,
+                    color: const Color(0xFFA78BFA),
                   ),
                 ),
               ],

@@ -22,54 +22,77 @@ class ResistorLabApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Professional engineering palette: deep indigo/navy with slate & amber accents
-    const primaryColor = Color(0xFF1E3A8A); // Deep Lab Navy Blue
-    const secondaryColor = Color(0xFF0284C7); // Electric Blue Accent
+    // High-Precision Black Engineering Theme
+    const darkBackground = Color(0xFF080D1A); // Deep pitch lab canvas
+    const darkSurface = Color(0xFF101726);    // Carbon-slate card surface
+    const darkBorder = Color(0xFF1E293B);     // Crisp slate divider / border
+    const electricCyan = Color(0xFF00E5FF);   // Cyber Cyan primary accent
+    const amberAccent = Color(0xFFF59E0B);    // Electric Amber indicator
+    const emeraldAccent = Color(0xFF10B981);  // Digital Emerald
 
     return MaterialApp(
-      title: 'Resistor Lab',
+      title: 'Resistor',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: primaryColor,
-          primary: primaryColor,
-          secondary: secondaryColor,
-          surface: Colors.white,
-          brightness: Brightness.light,
+        brightness: Brightness.dark,
+        colorScheme: const ColorScheme.dark(
+          primary: electricCyan,
+          onPrimary: Color(0xFF080D1A),
+          primaryContainer: Color(0xFF0E3A4A),
+          onPrimaryContainer: Color(0xFF67E8F9),
+          secondary: amberAccent,
+          onSecondary: Color(0xFF080D1A),
+          secondaryContainer: Color(0xFF451A03),
+          onSecondaryContainer: Color(0xFFFDE68A),
+          tertiary: emeraldAccent,
+          surface: darkSurface,
+          onSurface: Color(0xFFF8FAFC),
+          onSurfaceVariant: Color(0xFF94A3B8),
+          outline: darkBorder,
+          outlineVariant: Color(0xFF334155),
         ),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC), // Cool clean lab slate
+        scaffoldBackgroundColor: darkBackground,
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
           scrolledUnderElevation: 1,
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF0F172A),
+          backgroundColor: darkBackground,
+          foregroundColor: Color(0xFFF8FAFC),
           titleTextStyle: TextStyle(
-            color: Color(0xFF0F172A),
+            color: Color(0xFFF8FAFC),
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
           ),
         ),
         cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 1,
+          color: darkSurface,
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+            side: const BorderSide(color: darkBorder, width: 1.2),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
+            backgroundColor: electricCyan,
+            foregroundColor: const Color(0xFF080D1A),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFF8FAFC),
+            side: const BorderSide(color: Color(0xFF334155), width: 1.2),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

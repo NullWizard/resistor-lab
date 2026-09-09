@@ -31,7 +31,7 @@ class TypesScreen extends StatelessWidget {
                     context,
                     title: '1. Fixed Resistors',
                     subtitle: 'Resistors with a permanent, unchanging ohmic resistance value.',
-                    badgeColor: const Color(0xFF2563EB),
+                    badgeColor: const Color(0xFF38BDF8),
                   ),
                   const SizedBox(height: 12),
                   _buildResponsiveGrid(
@@ -41,8 +41,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Carbon Composition Resistor',
                         icon: Icons.grain_rounded,
-                        accentColor: const Color(0xFF92400E),
-                        backgroundColor: const Color(0xFFFEF3C7),
+                        accentColor: const Color(0xFFF59E0B),
                         whatItDoes:
                             'Provides fixed electrical resistance with high energy surge absorption capability.',
                         howItWorks:
@@ -54,8 +53,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Carbon Film Resistor',
                         icon: Icons.layers_rounded,
-                        accentColor: const Color(0xFFD97706),
-                        backgroundColor: const Color(0xFFFFFBEB),
+                        accentColor: const Color(0xFFFBBF24),
                         whatItDoes:
                             'General-purpose resistor offering good tolerance (±5%) and better stability than carbon composition.',
                         howItWorks:
@@ -67,8 +65,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Metal Film Resistor',
                         icon: Icons.precision_manufacturing_rounded,
-                        accentColor: const Color(0xFF0284C7),
-                        backgroundColor: const Color(0xFFF0F9FF),
+                        accentColor: const Color(0xFF38BDF8),
                         whatItDoes:
                             'High-precision resistor with very low electrical noise and exceptional temperature stability.',
                         howItWorks:
@@ -80,8 +77,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Wire Wound Resistor',
                         icon: Icons.linear_scale_rounded,
-                        accentColor: const Color(0xFFB91C1C),
-                        backgroundColor: const Color(0xFFFEF2F2),
+                        accentColor: const Color(0xFFF87171),
                         whatItDoes:
                             'High-power resistor capable of dissipating substantial heat without thermal breakdown.',
                         howItWorks:
@@ -98,7 +94,7 @@ class TypesScreen extends StatelessWidget {
                     context,
                     title: '2. Variable Resistors',
                     subtitle: 'Resistors whose ohmic value can be manually or mechanically adjusted.',
-                    badgeColor: const Color(0xFF7C3AED),
+                    badgeColor: const Color(0xFFA78BFA),
                   ),
                   const SizedBox(height: 12),
                   _buildResponsiveGrid(
@@ -108,8 +104,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Potentiometer (Pot)',
                         icon: Icons.tune_rounded,
-                        accentColor: const Color(0xFF7C3AED),
-                        backgroundColor: const Color(0xFFF5F3FF),
+                        accentColor: const Color(0xFFA78BFA),
                         whatItDoes:
                             'A 3-terminal variable resistor primarily configured as an adjustable voltage divider.',
                         howItWorks:
@@ -121,8 +116,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Rheostat',
                         icon: Icons.speed_rounded,
-                        accentColor: const Color(0xFF0D9488),
-                        backgroundColor: const Color(0xFFF0FDFA),
+                        accentColor: const Color(0xFF2DD4BF),
                         whatItDoes:
                             'A 2-terminal variable resistor designed to directly control and regulate electric current flow.',
                         howItWorks:
@@ -134,8 +128,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Preset / Trimmer (Trimpot)',
                         icon: Icons.build_circle_rounded,
-                        accentColor: const Color(0xFF0284C7),
-                        backgroundColor: const Color(0xFFF0F9FF),
+                        accentColor: const Color(0xFF60A5FA),
                         whatItDoes:
                             'Miniature adjustable resistor mounted directly onto circuit boards for factory or one-time calibration.',
                         howItWorks:
@@ -152,7 +145,7 @@ class TypesScreen extends StatelessWidget {
                     context,
                     title: '3. Special-Purpose Resistors',
                     subtitle: 'Non-linear resistors whose resistance changes in response to physical quantities.',
-                    badgeColor: const Color(0xFFEA580C),
+                    badgeColor: const Color(0xFFF97316),
                   ),
                   const SizedBox(height: 12),
                   _buildResponsiveGrid(
@@ -162,8 +155,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'LDR (Light Dependent Resistor)',
                         icon: Icons.light_mode_rounded,
-                        accentColor: const Color(0xFFD97706),
-                        backgroundColor: const Color(0xFFFEF3C7),
+                        accentColor: const Color(0xFFFBBF24),
                         whatItDoes:
                             'A light-sensitive resistor whose resistance decreases significantly as light intensity increases.',
                         howItWorks:
@@ -175,8 +167,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Thermistor (NTC / PTC)',
                         icon: Icons.device_thermostat_rounded,
-                        accentColor: const Color(0xFFDC2626),
-                        backgroundColor: const Color(0xFFFEF2F2),
+                        accentColor: const Color(0xFFFB7185),
                         whatItDoes:
                             'A temperature-sensitive resistor whose resistance varies predictably with thermal changes.',
                         howItWorks:
@@ -188,8 +179,7 @@ class TypesScreen extends StatelessWidget {
                         context,
                         name: 'Varistor (VDR / MOV)',
                         icon: Icons.bolt_rounded,
-                        accentColor: const Color(0xFF4338CA),
-                        backgroundColor: const Color(0xFFEEF2FF),
+                        accentColor: const Color(0xFF818CF8),
                         whatItDoes:
                             'A voltage-dependent non-linear resistor used for transient surge and lightning spike protection.',
                         howItWorks:
@@ -214,15 +204,23 @@ class TypesScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F3FF),
+        color: const Color(0xFF101726),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDDD6FE)),
+        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.category_rounded, color: Color(0xFF7C3AED), size: 32),
-          SizedBox(width: 16),
-          Expanded(
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFA78BFA).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFA78BFA).withValues(alpha: 0.3)),
+            ),
+            child: const Icon(Icons.category_rounded, color: Color(0xFFA78BFA), size: 28),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -231,7 +229,7 @@ class TypesScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF4C1D95),
+                    color: Color(0xFFF8FAFC),
                   ),
                 ),
                 SizedBox(height: 4),
@@ -239,7 +237,7 @@ class TypesScreen extends StatelessWidget {
                   'A quick guide to fixed, variable, and special resistors used in the lab.',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF475569),
+                    color: Color(0xFF94A3B8),
                     height: 1.35,
                   ),
                 ),
@@ -277,7 +275,7 @@ class TypesScreen extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: Color(0xFFF8FAFC),
               ),
             ),
           ],
@@ -285,7 +283,7 @@ class TypesScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
         ),
       ],
     );
@@ -340,16 +338,16 @@ class TypesScreen extends StatelessWidget {
     required String name,
     required IconData icon,
     required Color accentColor,
-    required Color backgroundColor,
     required String whatItDoes,
     required String howItWorks,
     required String application,
   }) {
     return Card(
-      elevation: 1,
+      elevation: 0,
+      color: const Color(0xFF101726),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18.0),
@@ -364,9 +362,9 @@ class TypesScreen extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: backgroundColor,
+                    color: accentColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: accentColor.withValues(alpha: 0.25)),
+                    border: Border.all(color: accentColor.withValues(alpha: 0.3)),
                   ),
                   child: Icon(icon, color: accentColor, size: 24),
                 ),
@@ -377,19 +375,19 @@ class TypesScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 15.5,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: Color(0xFFF8FAFC),
                       height: 1.25,
                     ),
                   ),
                 ),
               ],
             ),
-            const Divider(height: 20),
+            const Divider(height: 20, color: Color(0xFF1E293B)),
 
             // 1. What it does
             _buildDetailRow(
               tag: 'What it does',
-              tagColor: const Color(0xFF0284C7),
+              tagColor: const Color(0xFF38BDF8),
               content: whatItDoes,
             ),
             const SizedBox(height: 10),
@@ -397,7 +395,7 @@ class TypesScreen extends StatelessWidget {
             // 2. How it works
             _buildDetailRow(
               tag: 'How it works',
-              tagColor: const Color(0xFF0D9488),
+              tagColor: const Color(0xFF2DD4BF),
               content: howItWorks,
             ),
             const SizedBox(height: 10),
@@ -405,7 +403,7 @@ class TypesScreen extends StatelessWidget {
             // 3. Common Application
             _buildDetailRow(
               tag: 'Lab Application',
-              tagColor: const Color(0xFF7C3AED),
+              tagColor: const Color(0xFFA78BFA),
               content: application,
             ),
           ],
@@ -423,10 +421,11 @@ class TypesScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
           decoration: BoxDecoration(
-            color: tagColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(4),
+            color: tagColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: tagColor.withValues(alpha: 0.25)),
           ),
           child: Text(
             tag,
@@ -438,12 +437,12 @@ class TypesScreen extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           content,
           style: const TextStyle(
             fontSize: 12.5,
-            color: Color(0xFF334155),
+            color: Color(0xFFCBD5E1),
             height: 1.4,
           ),
         ),

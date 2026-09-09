@@ -45,10 +45,17 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
   int _band4 = 2; // Default Gold
   int _band5 = 0; // Default Brown (±1%)
   int _band6 = 0; // Default Brown (100 ppm/K)
-  
-  ResistorScanDebugInfo? _lastScanDebugInfo;
 
   final ImagePicker _picker = ImagePicker();
+
+  // Camera Controls State: Zoom, Flash/Torch, Tap-to-Focus
+  double _currentZoom = 1.0;
+  double _minZoom = 1.0;
+  double _maxZoom = 5.0;
+  double _baseScale = 1.0;
+  FlashMode _currentFlashMode = FlashMode.off;
+  Offset? _tapFocusOffset;
+  bool _showFocusRing = false;
 
   @override
   void initState() {
@@ -56,6 +63,8 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     if (widget.initialImageBytesForTesting != null) {
       _selectedImageBytes = widget.initialImageBytesForTesting;
       _isAdjustingImage = true;
+    } else {
+      _initCamera();
     }
   }
 
@@ -65,14 +74,27 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       if (cameras.isNotEmpty) {
         final controller = CameraController(
           cameras.first,
-          ResolutionPreset.medium,
+          ResolutionPreset.high,
           enableAudio: false,
         );
         await controller.initialize();
+        
+        double minZ = 1.0;
+        double maxZ = 5.0;
+        try {
+          minZ = await controller.getMinZoomLevel();
+          maxZ = await controller.getMaxZoomLevel();
+          if (maxZ > 5.0) maxZ = 5.0;
+        } catch (_) {}
+
         if (mounted) {
           setState(() {
             _cameraController = controller;
             _isCameraInitialized = true;
+            _minZoom = minZ;
+            _maxZoom = maxZ;
+            _currentZoom = minZ;
+            _currentFlashMode = FlashMode.off;
           });
         }
       }
@@ -83,6 +105,55 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
         });
       }
     }
+  }
+
+  Future<void> _setZoomLevel(double zoom) async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    final clamped = zoom.clamp(_minZoom, _maxZoom);
+    try {
+      await _cameraController!.setZoomLevel(clamped);
+      if (mounted) {
+        setState(() => _currentZoom = clamped);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFlash() async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    try {
+      final newMode = _currentFlashMode == FlashMode.off
+          ? FlashMode.torch
+          : (_currentFlashMode == FlashMode.torch ? FlashMode.auto : FlashMode.off);
+      await _cameraController!.setFlashMode(newMode);
+      if (mounted) {
+        setState(() => _currentFlashMode = newMode);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    try {
+      final double x = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+      final double y = (details.localPosition.dy / constraints.maxHeight).clamp(0.0, 1.0);
+      final point = Offset(x, y);
+
+      await _cameraController!.setFocusPoint(point);
+      await _cameraController!.setExposurePoint(point);
+      await _cameraController!.setFocusMode(FocusMode.auto);
+
+      if (mounted) {
+        setState(() {
+          _tapFocusOffset = details.localPosition;
+          _showFocusRing = true;
+        });
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (mounted) {
+            setState(() => _showFocusRing = false);
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -284,7 +355,6 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     setState(() {
       _capturedImageBytes = bytes;
       _isProcessing = false;
-      _lastScanDebugInfo = result.debugInfo;
       if (result.isSuccess) {
         _hasScanError = false;
         _errorMessage = null;
@@ -428,6 +498,42 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     );
   }
 
+  Widget _buildZoomPill(double targetZoom, String label) {
+    final bool isSelected = (_currentZoom - targetZoom).abs() < 0.25;
+    return GestureDetector(
+      onTap: () => _setZoomLevel(targetZoom),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF00E5FF) : Colors.black.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF00E5FF) : Colors.white24,
+            width: 1.2,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF080D1A) : Colors.white,
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Viewfinder frame showing live preview, interactive image adjustment, captured image, or placeholder.
   Widget _buildViewfinderContainer() {
     return ClipRRect(
@@ -435,7 +541,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       child: Container(
         height: 290,
         width: double.infinity,
-        color: const Color(0xFF0F172A),
+        color: const Color(0xFF0A0F1D),
         child: LayoutBuilder(
           builder: (context, constraints) {
             _viewportWidth = constraints.maxWidth;
@@ -472,21 +578,57 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                     fit: BoxFit.cover,
                   )
                 else if (_isCameraInitialized && _cameraController != null)
-                  CameraPreview(_cameraController!)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) => _onTapToFocus(details, constraints),
+                    onScaleStart: (_) => _baseScale = _currentZoom,
+                    onScaleUpdate: (details) => _setZoomLevel((_baseScale * details.scale).clamp(_minZoom, _maxZoom)),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_cameraController!),
+                        if (_showFocusRing && _tapFocusOffset != null)
+                          Positioned(
+                            left: _tapFocusOffset!.dx - 26,
+                            top: _tapFocusOffset!.dy - 26,
+                            child: IgnorePointer(
+                              child: Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFF00E5FF), width: 2),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.center_focus_strong_rounded, color: Color(0xFF00E5FF), size: 24),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  )
                 else
                   Container(
-                    color: const Color(0xFF1E293B),
+                    color: const Color(0xFF101726),
                     child: const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.camera_alt_outlined,
                           size: 48,
-                          color: Color(0xFF94A3B8),
+                          color: Color(0xFF64748B),
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Camera Viewfinder',
+                          'Optical Sensor Viewfinder',
                           style: TextStyle(
                             color: Color(0xFFE2E8F0),
                             fontSize: 14,
@@ -507,30 +649,31 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.amberAccent,
-                          width: 2.2,
+                          color: const Color(0xFF00E5FF),
+                          width: 2.0,
                         ),
                         color: Colors.black.withValues(alpha: 0.18),
                       ),
                       child: Center(
                         child: Container(
                           height: 1.5,
-                          color: Colors.amberAccent.withValues(alpha: 0.4),
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
                         ),
                       ),
                     ),
                   ),
                 ),
 
-                // Layer 3: Top Status Badge
+                // Layer 3: Top Status Badge (Left)
                 Positioned(
                   top: 12,
                   left: 14,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(6),
+                      color: Colors.black.withValues(alpha: 0.70),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white12),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -540,16 +683,16 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                           height: 8,
                           decoration: BoxDecoration(
                             color: _isAdjustingImage
-                                ? Colors.amberAccent
-                                : (_capturedImageBytes != null ? Colors.greenAccent : Colors.redAccent),
+                                ? const Color(0xFFF59E0B)
+                                : (_capturedImageBytes != null ? const Color(0xFF10B981) : const Color(0xFF00E5FF)),
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Text(
                           _isAdjustingImage
-                              ? 'Adjust Position'
-                              : (_capturedImageBytes != null ? 'Captured Image' : 'Live Guide'),
+                              ? 'Adjust Framing'
+                              : (_capturedImageBytes != null ? 'Captured Frame' : 'Live Sensor Guide'),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 11,
@@ -560,6 +703,70 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                     ),
                   ),
                 ),
+
+                // Layer 4: Top Flash / Torch Button (Right)
+                if (_isCameraInitialized && _cameraController != null && !_isAdjustingImage && _capturedImageBytes == null)
+                  Positioned(
+                    top: 12,
+                    right: 14,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _toggleFlash,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _currentFlashMode == FlashMode.torch
+                                ? const Color(0xFFF59E0B)
+                                : Colors.black.withValues(alpha: 0.70),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _currentFlashMode == FlashMode.torch
+                                  ? const Color(0xFFF59E0B)
+                                  : Colors.white24,
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Icon(
+                            _currentFlashMode == FlashMode.torch
+                                ? Icons.flash_on_rounded
+                                : (_currentFlashMode == FlashMode.auto ? Icons.flash_auto_rounded : Icons.flash_off_rounded),
+                            color: _currentFlashMode == FlashMode.torch ? const Color(0xFF080D1A) : Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Layer 5: Quick Zoom Level Selector (1x, 2x, 3x) at Bottom Center
+                if (_isCameraInitialized && _cameraController != null && !_isAdjustingImage && _capturedImageBytes == null)
+                  Positioned(
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildZoomPill(1.0, '1x'),
+                            const SizedBox(width: 6),
+                            _buildZoomPill(2.0, '2x'),
+                            const SizedBox(width: 6),
+                            _buildZoomPill(3.0, '3x'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -874,10 +1081,11 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       children: [
         // 1. Detected Bands Summary Card with Band Count Selector
         Card(
-          elevation: 1,
+          elevation: 0,
+          color: const Color(0xFF101726),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -892,40 +1100,22 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Detected Bands:',
+                            'DETECTED COLOR BANDS',
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF475569),
-                              letterSpacing: 0.4,
+                              color: Color(0xFF94A3B8),
+                              letterSpacing: 0.8,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Source: ${_lastScanDebugInfo?.preprocessingPass ?? "UNKNOWN"}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Resistor detected: ${(!_hasScanError && _lastScanDebugInfo?.preprocessingPass != 'NO_RESISTOR_FOUND' && _lastScanDebugInfo?.preprocessingPass != 'GEMINI_REJECTED') ? "YES" : "NO"}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
                             'Detected $_detectedBandCount bands',
                             key: const Key('detected_band_count_text'),
                             style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF0284C7),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF00E5FF),
                             ),
                           ),
                         ],
@@ -938,7 +1128,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF334155),
+                            color: Color(0xFF94A3B8),
                           ),
                         ),
                         DropdownButton<int>(
@@ -946,11 +1136,12 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                           value: const [4, 5, 6].contains(_selectedBandCount)
                               ? _selectedBandCount
                               : null,
+                          dropdownColor: const Color(0xFF101726),
                           underline: const SizedBox(),
                           style: const TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: Color(0xFFF8FAFC),
                           ),
                           items: const [
                             DropdownMenuItem(value: 4, child: Text('4 bands')),
@@ -997,11 +1188,11 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
 
         // 2. Calculated Value Card
         Card(
-          elevation: 1.5,
-          color: const Color(0xFFF0FDFA),
+          elevation: 0,
+          color: const Color(0xFF0F172A),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF99F6E4)),
+            side: const BorderSide(color: Color(0xFF0E3A4A), width: 1.2),
           ),
           child: Padding(
             padding: const EdgeInsets.all(18.0),
@@ -1012,7 +1203,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D9488),
+                    color: Color(0xFF00E5FF),
                     letterSpacing: 1.0,
                   ),
                 ),
@@ -1022,29 +1213,29 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFFF8FAFC),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${ResistorScannerService.formatResistance(calculation.nominalOhms)} nominal',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
                 if (_selectedBandCount == 6 && calculation.tempCoLabel != null) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2FE),
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFBAE6FD)),
+                      border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       'Temp. Coefficient: ${calculation.tempCoLabel}',
                       style: const TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0369A1),
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF67E8F9),
                       ),
                     ),
                   ),

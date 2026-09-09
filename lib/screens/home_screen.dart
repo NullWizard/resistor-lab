@@ -23,10 +23,10 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.electric_bolt_rounded, color: Color(0xFFD97706)),
+            Icon(Icons.electric_bolt_rounded, color: Color(0xFF00E5FF)),
             SizedBox(width: 10),
             Text(
-              'Resistor Lab',
+              'Resistor',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -230,7 +230,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  /// Polished Header with "Basic Electronics Lab", "Resistor Lab", and Subtitle.
+  /// Polished Header with "Basic Electronics Lab", "Resistor", and Subtitle.
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -238,16 +238,20 @@ class HomeScreen extends StatelessWidget {
       padding: const EdgeInsets.all(22.0),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF1E40AF), Color(0xFF0369A1)],
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.3),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E3A8A).withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -258,21 +262,21 @@ class HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
+              color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: Colors.white.withValues(alpha: 0.15),
               ),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.school_rounded, color: Colors.amberAccent, size: 14),
+                Icon(Icons.school_rounded, color: Color(0xFFF59E0B), size: 14),
                 SizedBox(width: 6),
                 Text(
                   'Basic Electronics Lab',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFFE2E8F0),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
@@ -285,7 +289,7 @@ class HomeScreen extends StatelessWidget {
 
           // Main Title
           Text(
-            'Resistor Lab',
+            'Resistor',
             style: theme.textTheme.headlineMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w900,
@@ -298,7 +302,7 @@ class HomeScreen extends StatelessWidget {
           Text(
             'Learn, calculate and test your knowledge of resistors.',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFFE0F2FE),
+              color: const Color(0xFF94A3B8),
               height: 1.4,
               fontWeight: FontWeight.w400,
             ),
@@ -321,10 +325,10 @@ class HomeScreen extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: const Color(0xFFF1F5F9),
+      color: const Color(0xFF101726),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1),
+        side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18.0),
@@ -336,12 +340,13 @@ class HomeScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
                   ),
                   child: const Icon(
                     Icons.assignment_outlined,
-                    color: Colors.white,
+                    color: Color(0xFF00E5FF),
                     size: 16,
                   ),
                 ),
@@ -350,7 +355,7 @@ class HomeScreen extends StatelessWidget {
                   'Lab Objectives',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF0F172A),
+                    color: const Color(0xFFF8FAFC),
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -367,7 +372,7 @@ class HomeScreen extends StatelessWidget {
                       padding: EdgeInsets.only(top: 2.0),
                       child: Icon(
                         Icons.check_circle_rounded,
-                        color: Color(0xFF059669),
+                        color: Color(0xFF10B981),
                         size: 16,
                       ),
                     ),
@@ -377,7 +382,7 @@ class HomeScreen extends StatelessWidget {
                         obj,
                         style: const TextStyle(
                           fontSize: 13.5,
-                          color: Color(0xFF334155),
+                          color: Color(0xFF94A3B8),
                           fontWeight: FontWeight.w500,
                           height: 1.35,
                         ),
@@ -407,10 +412,11 @@ class HomeScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Card(
-      elevation: 1,
+      elevation: 0,
+      color: const Color(0xFF101726),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
       ),
       child: InkWell(
         onTap: onTap,
@@ -425,10 +431,10 @@ class HomeScreen extends StatelessWidget {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: backgroundColor,
+                  color: accentColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: accentColor.withValues(alpha: 0.2),
+                    color: accentColor.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -452,16 +458,16 @@ class HomeScreen extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: const Color(0xFF334155)),
                       ),
                       child: Text(
                         moduleNumber,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF475569),
+                          color: accentColor,
                           letterSpacing: 0.4,
                         ),
                       ),
@@ -473,7 +479,7 @@ class HomeScreen extends StatelessWidget {
                       title,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF0F172A),
+                        color: const Color(0xFFF8FAFC),
                         fontSize: 16,
                       ),
                     ),
@@ -484,21 +490,21 @@ class HomeScreen extends StatelessWidget {
                       description,
                       style: const TextStyle(
                         fontSize: 12.5,
-                        color: Color(0xFF64748B),
+                        color: Color(0xFF94A3B8),
                         height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
 
-              // Navigation Arrow
+              // Forward Chevron Arrow
               const Padding(
                 padding: EdgeInsets.only(top: 14.0),
                 child: Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: Color(0xFF94A3B8),
+                  color: Color(0xFF475569),
                   size: 16,
                 ),
               ),

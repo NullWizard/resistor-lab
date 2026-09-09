@@ -268,21 +268,22 @@ class _QuizScreenState extends State<QuizScreen> {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14.5,
-                  color: Color(0xFF0F172A),
+                  color: Color(0xFFF8FAFC),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: const Color(0xFF101726),
                   borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF1E293B)),
                 ),
                 child: Text(
                   question.topic,
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF475569),
+                    color: Color(0xFF94A3B8),
                   ),
                 ),
               ),
@@ -295,19 +296,20 @@ class _QuizScreenState extends State<QuizScreen> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
-              minHeight: 8,
-              backgroundColor: const Color(0xFFE2E8F0),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+              minHeight: 6,
+              backgroundColor: const Color(0xFF1E293B),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
             ),
           ),
           const SizedBox(height: 20),
 
           // Question Card
           Card(
-            elevation: 1.5,
+            elevation: 0,
+            color: const Color(0xFF101726),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20.0),
@@ -316,7 +318,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 style: const TextStyle(
                   fontSize: 16.5,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F172A),
+                  color: Color(0xFFF8FAFC),
                   height: 1.4,
                 ),
               ),
@@ -342,19 +344,19 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFFEFF6FF)
-                        : Colors.white,
+                        ? const Color(0xFF00E5FF).withValues(alpha: 0.12)
+                        : const Color(0xFF101726),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF2563EB)
-                          : const Color(0xFFCBD5E1),
-                      width: isSelected ? 2 : 1,
+                          ? const Color(0xFF00E5FF)
+                          : const Color(0xFF1E293B),
+                      width: isSelected ? 1.5 : 1,
                     ),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                              color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -366,16 +368,16 @@ class _QuizScreenState extends State<QuizScreen> {
                       CircleAvatar(
                         radius: 14,
                         backgroundColor: isSelected
-                            ? const Color(0xFF2563EB)
-                            : const Color(0xFFF1F5F9),
+                            ? const Color(0xFF00E5FF)
+                            : const Color(0xFF1E293B),
                         child: Text(
                           letter,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF475569),
+                                ? const Color(0xFF080D1A)
+                                : const Color(0xFF94A3B8),
                           ),
                         ),
                       ),
@@ -389,8 +391,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                             color: isSelected
-                                ? const Color(0xFF1E3A8A)
-                                : const Color(0xFF1E293B),
+                                ? const Color(0xFFF8FAFC)
+                                : const Color(0xFFCBD5E1),
                             height: 1.3,
                           ),
                         ),
@@ -398,7 +400,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       if (isSelected)
                         const Icon(
                           Icons.check_circle_rounded,
-                          color: Color(0xFF2563EB),
+                          color: Color(0xFF00E5FF),
                           size: 20,
                         ),
                     ],
@@ -413,10 +415,10 @@ class _QuizScreenState extends State<QuizScreen> {
           ElevatedButton(
             onPressed: _selectedOptionIndex != null ? _onNextPressed : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: const Color(0xFFCBD5E1),
-              disabledForegroundColor: const Color(0xFF94A3B8),
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: const Color(0xFF080D1A),
+              disabledBackgroundColor: const Color(0xFF1E293B),
+              disabledForegroundColor: const Color(0xFF64748B),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -461,17 +463,17 @@ class _QuizScreenState extends State<QuizScreen> {
     if (percentage >= 80) {
       performanceMessage =
           'Great score! You have a solid grasp of resistor basics and color codes.';
-      badgeColor = const Color(0xFF059669);
+      badgeColor = const Color(0xFF10B981);
       resultIcon = Icons.stars_rounded;
     } else if (percentage >= 50) {
       performanceMessage =
           'Good work! Review resistor tolerance and color codes once more.';
-      badgeColor = const Color(0xFFD97706);
+      badgeColor = const Color(0xFFF59E0B);
       resultIcon = Icons.thumb_up_rounded;
     } else {
       performanceMessage =
           'Keep practicing! Go through the notes and try the quiz again.';
-      badgeColor = const Color(0xFFDC2626);
+      badgeColor = const Color(0xFFEF4444);
       resultIcon = Icons.refresh_rounded;
     }
 
@@ -482,10 +484,11 @@ class _QuizScreenState extends State<QuizScreen> {
         children: [
           // Results Card
           Card(
-            elevation: 2,
+            elevation: 0,
+            color: const Color(0xFF101726),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
             ),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -495,8 +498,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     width: 68,
                     height: 68,
                     decoration: BoxDecoration(
-                      color: badgeColor.withValues(alpha: 0.12),
+                      color: badgeColor.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
+                      border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
                     ),
                     child: Icon(resultIcon, color: badgeColor, size: 36),
                   ),
@@ -507,7 +511,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: Color(0xFFF8FAFC),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -519,9 +523,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       horizontal: 24,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: const Color(0xFF080D1A),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFF1E293B)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -532,7 +536,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               'Score',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF64748B),
+                                color: Color(0xFF94A3B8),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -542,7 +546,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                                color: Color(0xFFF8FAFC),
                               ),
                             ),
                           ],
@@ -550,7 +554,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         Container(
                           width: 1,
                           height: 36,
-                          color: const Color(0xFFCBD5E1),
+                          color: const Color(0xFF1E293B),
                         ),
                         Column(
                           children: [
@@ -558,7 +562,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               'Percentage',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF64748B),
+                                color: Color(0xFF94A3B8),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -584,7 +588,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 13.5,
-                      color: Color(0xFF475569),
+                      color: Color(0xFFCBD5E1),
                       height: 1.4,
                     ),
                   ),
@@ -600,8 +604,8 @@ class _QuizScreenState extends State<QuizScreen> {
             icon: const Icon(Icons.replay_rounded),
             label: const Text('Restart Quiz'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: const Color(0xFF080D1A),
               padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -616,6 +620,8 @@ class _QuizScreenState extends State<QuizScreen> {
             icon: const Icon(Icons.home_rounded),
             label: const Text('Return Home'),
             style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFF8FAFC),
+              side: const BorderSide(color: Color(0xFF334155), width: 1.2),
               padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
