@@ -131,6 +131,18 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     } catch (_) {}
   }
 
+  Future<void> _turnOffFlash() async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    if (_currentFlashMode != FlashMode.off) {
+      try {
+        await _cameraController!.setFlashMode(FlashMode.off);
+        if (mounted) {
+          setState(() => _currentFlashMode = FlashMode.off);
+        }
+      } catch (_) {}
+    }
+  }
+
   Future<void> _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
     if (_cameraController == null || !_isCameraInitialized) return;
     try {
@@ -158,6 +170,11 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
 
   @override
   void dispose() {
+    if (_cameraController != null && _isCameraInitialized && _currentFlashMode != FlashMode.off) {
+      try {
+        _cameraController!.setFlashMode(FlashMode.off);
+      } catch (_) {}
+    }
     _cameraController?.dispose();
     _transformationController.dispose();
     super.dispose();
@@ -187,9 +204,12 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       try {
         setState(() => _isProcessing = true);
         final file = await _cameraController!.takePicture();
+        // Turn off flash / torch immediately after photo is captured so it never stays on forever
+        await _turnOffFlash();
         final bytes = await file.readAsBytes();
         _startAdjustment(bytes);
       } catch (e) {
+        await _turnOffFlash();
         _handleScanFailure("Failed to capture image: $e");
       }
     }
@@ -213,6 +233,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
 
   Future<void> _pickFromGallery() async {
     if (_isProcessing) return;
+    await _turnOffFlash();
     try {
       final photo = await _picker.pickImage(
         source: ImageSource.gallery,
