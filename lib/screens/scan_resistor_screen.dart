@@ -6,6 +6,7 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import '../services/resistor_scanner_service.dart';
 import '../services/scanner/scanner_coordinator.dart';
+import '../widgets/glass_components.dart';
 
 /// Screen for scanning resistors via camera or gallery image.
 class ScanResistorScreen extends StatefulWidget {
@@ -450,7 +451,10 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     );
 
     return Scaffold(
+      backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Scan Resistor'),
         leading: _isAdjustingImage
             ? IconButton(
@@ -468,49 +472,51 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Camera / Image Viewfinder Container
-                  _buildViewfinderContainer(),
-                  const SizedBox(height: 14),
+      body: FuturisticBackground(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Camera / Image Viewfinder Container
+                    _buildViewfinderContainer(),
+                    const SizedBox(height: 14),
 
-                  // Guide / Instruction text
-                  Center(
-                    child: Text(
-                      _isAdjustingImage
-                          ? 'Move and zoom the image until the resistor is inside the guide.'
-                          : 'Place the resistor inside the guide and make sure the color bands are clearly visible.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF475569),
-                        fontWeight: FontWeight.w500,
-                        height: 1.35,
+                    // Guide / Instruction text
+                    Center(
+                      child: Text(
+                        _isAdjustingImage
+                            ? 'Move and zoom the image until the resistor is inside the guide.'
+                            : 'Place the resistor inside the guide and make sure the color bands are clearly visible.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
+                          height: 1.35,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Action State (Scanning, Adjusting, Error, or Results)
-                  if (_isProcessing)
-                    _buildProcessingIndicator()
-                  else if (_isAdjustingImage)
-                    _buildAdjustmentControls()
-                  else if (_hasScanError)
-                    _buildErrorView()
-                  else if (_capturedImageBytes != null)
-                    _buildResultsSection(calculation)
-                  else
-                    _buildCaptureControls(),
-                  const SizedBox(height: 20),
-                ],
+                    // Action State (Scanning, Adjusting, Error, or Results)
+                    if (_isProcessing)
+                      _buildProcessingIndicator()
+                    else if (_isAdjustingImage)
+                      _buildAdjustmentControls()
+                    else if (_hasScanError)
+                      _buildErrorView()
+                    else if (_capturedImageBytes != null)
+                      _buildResultsSection(calculation)
+                    else
+                      _buildCaptureControls(),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),
@@ -933,14 +939,14 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       padding: EdgeInsets.symmetric(vertical: 24.0),
       child: Column(
         children: [
-          CircularProgressIndicator(),
+          CircularProgressIndicator(color: Color(0xFF00E5FF)),
           SizedBox(height: 14),
           Text(
             'Analyzing resistor color bands...',
             style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF475569),
+              color: Color(0xFF94A3B8),
             ),
           ),
         ],
@@ -950,107 +956,59 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
 
   /// Friendly error view when detection is unclear.
   Widget _buildErrorView() {
-    return Card(
-      elevation: 1,
-      color: const Color(0xFFFFFBEB),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFFDE68A)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 24),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _errorMessage ?? "Resistor not detected clearly.",
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF92400E),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Scanning Tips for Better Accuracy:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Color(0xFF78350F),
-              ),
-            ),
-            const SizedBox(height: 6),
-            _buildTipItem('Move the resistor closer to the camera guide'),
-            _buildTipItem('Use good, uniform lighting without harsh reflections'),
-            _buildTipItem('Keep all resistor color bands clearly visible inside the guide'),
-            _buildTipItem('Place the resistor on a plain, light background'),
-            const SizedBox(height: 16),
-            if (_selectedImageBytes != null) ...[
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _hasScanError = false;
-                      _errorMessage = null;
-                      _isAdjustingImage = true;
-                    });
-                  },
-                  icon: const Icon(Icons.crop_free_rounded),
-                  label: const Text('Adjust Position Again'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF92400E),
-                    side: const BorderSide(color: Color(0xFFD97706)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+    return GlassContainer(
+      borderRadius: 18,
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _errorMessage ?? "Resistor not detected clearly.",
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFCD34D),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
             ],
-            if (_capturedImageBytes != null) ...[
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _hasScanError = false;
-                      _errorMessage = null;
-                    });
-                  },
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('Enter Bands Manually'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0284C7),
-                    side: const BorderSide(color: Color(0xFF0284C7)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Scanning Tips for Better Accuracy:',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFFFDE68A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          _buildTipItem('Move the resistor closer to the camera guide'),
+          _buildTipItem('Use good, uniform lighting without harsh reflections'),
+          _buildTipItem('Keep all resistor color bands clearly visible inside the guide'),
+          _buildTipItem('Place the resistor on a plain, light background'),
+          const SizedBox(height: 16),
+          if (_selectedImageBytes != null) ...[
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _resetScan,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Try Again'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD97706),
-                  foregroundColor: Colors.white,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _hasScanError = false;
+                    _errorMessage = null;
+                    _isAdjustingImage = true;
+                  });
+                },
+                icon: const Icon(Icons.crop_free_rounded),
+                label: const Text('Adjust Position Again'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFCD34D),
+                  side: const BorderSide(color: Color(0xFFF59E0B)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1058,8 +1016,49 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
           ],
-        ),
+          if (_capturedImageBytes != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _hasScanError = false;
+                    _errorMessage = null;
+                  });
+                },
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('Enter Bands Manually'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF00E5FF),
+                  side: const BorderSide(color: Color(0xFF00E5FF)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _resetScan,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1072,13 +1071,13 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 4.0),
-            child: Icon(Icons.circle, size: 6, color: Color(0xFFB45309)),
+            child: Icon(Icons.circle, size: 6, color: Color(0xFFF59E0B)),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 12.5, color: Color(0xFF78350F)),
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFFE2E8F0)),
             ),
           ),
         ],
@@ -1100,310 +1099,290 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 1. Detected Bands Summary Card with Band Count Selector
-        Card(
-          elevation: 0,
-          color: const Color(0xFF101726),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF1E293B), width: 1.2),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'DETECTED COLOR BANDS',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF94A3B8),
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Detected $_detectedBandCount bands',
-                            key: const Key('detected_band_count_text'),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF00E5FF),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
+        // 1. Detected Bands Summary GlassContainer with Band Count Selector
+        GlassContainer(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Bands: ',
+                          'DETECTED COLOR BANDS',
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                             color: Color(0xFF94A3B8),
+                            letterSpacing: 0.8,
                           ),
                         ),
-                        DropdownButton<int>(
-                          key: const Key('scanner_band_count_dropdown'),
-                          value: const [4, 5, 6].contains(_selectedBandCount)
-                              ? _selectedBandCount
-                              : null,
-                          dropdownColor: const Color(0xFF101726),
-                          underline: const SizedBox(),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Detected $_detectedBandCount bands',
+                          key: const Key('detected_band_count_text'),
                           style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFF8FAFC),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF00E5FF),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 4, child: Text('4 bands')),
-                            DropdownMenuItem(value: 5, child: Text('5 bands')),
-                            DropdownMenuItem(value: 6, child: Text('6 bands')),
-                          ],
-                          onChanged: (newCount) {
-                            if (newCount != null) {
-                              setState(() {
-                                _selectedBandCount = newCount;
-                                _clampBandIndices();
-                              });
-                            }
-                          },
                         ),
                       ],
                     ),
+                  ),
+                  Row(
+                    children: [
+                      const Text(
+                        'Bands: ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      DropdownButton<int>(
+                        key: const Key('scanner_band_count_dropdown'),
+                        value: const [4, 5, 6].contains(_selectedBandCount)
+                            ? _selectedBandCount
+                            : null,
+                        dropdownColor: const Color(0xFF0F172A),
+                        underline: const SizedBox(),
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFF8FAFC),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 4, child: Text('4 bands')),
+                          DropdownMenuItem(value: 5, child: Text('5 bands')),
+                          DropdownMenuItem(value: 6, child: Text('6 bands')),
+                        ],
+                        onChanged: (newCount) {
+                          if (newCount != null) {
+                            setState(() {
+                              _selectedBandCount = newCount;
+                              _clampBandIndices();
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildBandChip('Band 1', b1.name, b1.color),
+                  _buildBandChip('Band 2', b2.name, b2.color),
+                  if (_selectedBandCount == 4) ...[
+                    _buildBandChip('Band 3', b3Mult.name, b3Mult.color),
+                    _buildBandChip('Band 4', b4Tol.name, b4Tol.color),
+                  ] else ...[
+                    _buildBandChip('Band 3', b3Digit.name, b3Digit.color),
+                    _buildBandChip('Band 4', b4Mult.name, b4Mult.color),
+                    _buildBandChip('Band 5', b5Tol.name, b5Tol.color),
+                    if (_selectedBandCount == 6)
+                      _buildBandChip('Band 6', b6Temp.name, b6Temp.color),
                   ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 2. Calculated Value GlassContainer
+        GlassContainer(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              const Text(
+                'CALCULATED VALUE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF00E5FF),
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${calculation.readableNominal} ${calculation.toleranceLabel}',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFF8FAFC),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${ResistorScannerService.formatResistance(calculation.nominalOhms)} nominal',
+                style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+              ),
+              if (_selectedBandCount == 6 && calculation.tempCoLabel != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    'Temp. Coefficient: ${calculation.tempCoLabel}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF67E8F9),
+                    ),
+                  ),
+                ),
+              ],
+              const Divider(height: 24, color: Colors.white12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildLimitText('Minimum', calculation.readableMin),
+                  _buildLimitText('Maximum', calculation.readableMax),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 3. Manual Correction GlassContainer
+        GlassContainer(
+          borderRadius: 20,
+          padding: const EdgeInsets.all(18.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.edit_note_rounded, color: Color(0xFF00E5FF), size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'Manual Correction',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'If camera lighting affected any band, adjust it below:',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 14),
+
+              if (_selectedBandCount == 4) ...[
+                // 4-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Multiplier), Band 4 (Tolerance)
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 1 (1st Digit)',
+                  value: _band1,
+                  onChanged: (val) => setState(() => _band1 = val!),
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _buildBandChip('Band 1', b1.name, b1.color),
-                    _buildBandChip('Band 2', b2.name, b2.color),
-                    if (_selectedBandCount == 4) ...[
-                      _buildBandChip('Band 3', b3Mult.name, b3Mult.color),
-                      _buildBandChip('Band 4', b4Tol.name, b4Tol.color),
-                    ] else ...[
-                      _buildBandChip('Band 3', b3Digit.name, b3Digit.color),
-                      _buildBandChip('Band 4', b4Mult.name, b4Mult.color),
-                      _buildBandChip('Band 5', b5Tol.name, b5Tol.color),
-                      if (_selectedBandCount == 6)
-                        _buildBandChip('Band 6', b6Temp.name, b6Temp.color),
-                    ],
-                  ],
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 2 (2nd Digit)',
+                  value: _band2,
+                  onChanged: (val) => setState(() => _band2 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildMultiplierCorrectionDropdown(
+                  label: 'Band 3 (Multiplier)',
+                  value: _band3,
+                  onChanged: (val) => setState(() => _band3 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildToleranceCorrectionDropdown(
+                  label: 'Band 4 (Tolerance)',
+                  value: _band4,
+                  onChanged: (val) => setState(() => _band4 = val!),
+                ),
+              ] else if (_selectedBandCount == 5) ...[
+                // 5-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Digit), Band 4 (Multiplier), Band 5 (Tolerance)
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 1 (1st Digit)',
+                  value: _band1,
+                  onChanged: (val) => setState(() => _band1 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 2 (2nd Digit)',
+                  value: _band2,
+                  onChanged: (val) => setState(() => _band2 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 3 (3rd Digit)',
+                  value: _band3,
+                  onChanged: (val) => setState(() => _band3 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildMultiplierCorrectionDropdown(
+                  label: 'Band 4 (Multiplier)',
+                  value: _band4,
+                  onChanged: (val) => setState(() => _band4 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildToleranceCorrectionDropdown(
+                  label: 'Band 5 (Tolerance)',
+                  value: _band5,
+                  onChanged: (val) => setState(() => _band5 = val!),
+                ),
+              ] else ...[
+                // 6-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Digit), Band 4 (Multiplier), Band 5 (Tolerance), Band 6 (TempCo)
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 1 (1st Digit)',
+                  value: _band1,
+                  onChanged: (val) => setState(() => _band1 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 2 (2nd Digit)',
+                  value: _band2,
+                  onChanged: (val) => setState(() => _band2 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildDigitCorrectionDropdown(
+                  label: 'Band 3 (3rd Digit)',
+                  value: _band3,
+                  onChanged: (val) => setState(() => _band3 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildMultiplierCorrectionDropdown(
+                  label: 'Band 4 (Multiplier)',
+                  value: _band4,
+                  onChanged: (val) => setState(() => _band4 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildToleranceCorrectionDropdown(
+                  label: 'Band 5 (Tolerance)',
+                  value: _band5,
+                  onChanged: (val) => setState(() => _band5 = val!),
+                ),
+                const SizedBox(height: 10),
+                _buildTempCoCorrectionDropdown(
+                  label: 'Band 6 (Temp. Coefficient)',
+                  value: _band6,
+                  onChanged: (val) => setState(() => _band6 = val!),
                 ),
               ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // 2. Calculated Value Card
-        Card(
-          elevation: 0,
-          color: const Color(0xFF0F172A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF0E3A4A), width: 1.2),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(18.0),
-            child: Column(
-              children: [
-                const Text(
-                  'CALCULATED VALUE',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF00E5FF),
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${calculation.readableNominal} ${calculation.toleranceLabel}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFF8FAFC),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${ResistorScannerService.formatResistance(calculation.nominalOhms)} nominal',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                ),
-                if (_selectedBandCount == 6 && calculation.tempCoLabel != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      'Temp. Coefficient: ${calculation.tempCoLabel}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF67E8F9),
-                      ),
-                    ),
-                  ),
-                ],
-                const Divider(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildLimitText('Minimum', calculation.readableMin),
-                    _buildLimitText('Maximum', calculation.readableMax),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // 3. Manual Correction Section
-        Card(
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 20),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Manual Correction',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'If camera lighting affected any band, adjust it below:',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 12),
-
-                if (_selectedBandCount == 4) ...[
-                  // 4-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Multiplier), Band 4 (Tolerance)
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 1 (1st Digit)',
-                    value: _band1,
-                    onChanged: (val) => setState(() => _band1 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 2 (2nd Digit)',
-                    value: _band2,
-                    onChanged: (val) => setState(() => _band2 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildMultiplierCorrectionDropdown(
-                    label: 'Band 3 (Multiplier)',
-                    value: _band3,
-                    onChanged: (val) => setState(() => _band3 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildToleranceCorrectionDropdown(
-                    label: 'Band 4 (Tolerance)',
-                    value: _band4,
-                    onChanged: (val) => setState(() => _band4 = val!),
-                  ),
-                ] else if (_selectedBandCount == 5) ...[
-                  // 5-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Digit), Band 4 (Multiplier), Band 5 (Tolerance)
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 1 (1st Digit)',
-                    value: _band1,
-                    onChanged: (val) => setState(() => _band1 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 2 (2nd Digit)',
-                    value: _band2,
-                    onChanged: (val) => setState(() => _band2 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 3 (3rd Digit)',
-                    value: _band3,
-                    onChanged: (val) => setState(() => _band3 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildMultiplierCorrectionDropdown(
-                    label: 'Band 4 (Multiplier)',
-                    value: _band4,
-                    onChanged: (val) => setState(() => _band4 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildToleranceCorrectionDropdown(
-                    label: 'Band 5 (Tolerance)',
-                    value: _band5,
-                    onChanged: (val) => setState(() => _band5 = val!),
-                  ),
-                ] else ...[
-                  // 6-band: Band 1 (Digit), Band 2 (Digit), Band 3 (Digit), Band 4 (Multiplier), Band 5 (Tolerance), Band 6 (TempCo)
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 1 (1st Digit)',
-                    value: _band1,
-                    onChanged: (val) => setState(() => _band1 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 2 (2nd Digit)',
-                    value: _band2,
-                    onChanged: (val) => setState(() => _band2 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildDigitCorrectionDropdown(
-                    label: 'Band 3 (3rd Digit)',
-                    value: _band3,
-                    onChanged: (val) => setState(() => _band3 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildMultiplierCorrectionDropdown(
-                    label: 'Band 4 (Multiplier)',
-                    value: _band4,
-                    onChanged: (val) => setState(() => _band4 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildToleranceCorrectionDropdown(
-                    label: 'Band 5 (Tolerance)',
-                    value: _band5,
-                    onChanged: (val) => setState(() => _band5 = val!),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildTempCoCorrectionDropdown(
-                    label: 'Band 6 (Temp. Coefficient)',
-                    value: _band6,
-                    onChanged: (val) => setState(() => _band6 = val!),
-                  ),
-                ],
-              ],
-            ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
@@ -1417,9 +1396,11 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                 icon: const Icon(Icons.camera_alt_outlined),
                 label: const Text('Scan Again'),
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white24, width: 1.2),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
@@ -1442,11 +1423,13 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                 icon: const Icon(Icons.check_circle_outline),
                 label: const Text('Use These Bands'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF00E5FF),
+                  foregroundColor: const Color(0xFF080D1A),
+                  elevation: 4,
+                  shadowColor: const Color(0xFF00E5FF).withValues(alpha: 0.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
@@ -1462,15 +1445,15 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
         ),
         const SizedBox(height: 2),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 14.5,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
+            color: Color(0xFFF8FAFC),
           ),
         ),
       ],
@@ -1481,9 +1464,9 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFF0F172A).withValues(alpha: 0.60),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1495,7 +1478,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
               color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: color == Colors.white ? Colors.grey : Colors.black12,
+                color: color == Colors.white ? Colors.grey : Colors.white24,
                 width: 0.5,
               ),
             ),
@@ -1506,7 +1489,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1E293B),
+              color: Color(0xFFF1F5F9),
             ),
           ),
         ],
@@ -1524,10 +1507,17 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       key: ValueKey('$label-$safeValue'),
       initialValue: safeValue,
       isExpanded: true,
+      dropdownColor: const Color(0xFF0F172A),
+      style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13.5),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor: const Color(0xFF0F172A).withValues(alpha: 0.5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
       ),
       items: List.generate(ResistorScannerService.digitColors.length, (i) {
         final b = ResistorScannerService.digitColors[i];
@@ -1556,10 +1546,17 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       key: ValueKey('$label-$safeValue'),
       initialValue: safeValue,
       isExpanded: true,
+      dropdownColor: const Color(0xFF0F172A),
+      style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13.5),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor: const Color(0xFF0F172A).withValues(alpha: 0.5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
       ),
       items: List.generate(ResistorScannerService.multiplierColors.length, (i) {
         final b = ResistorScannerService.multiplierColors[i];
@@ -1588,10 +1585,17 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       key: ValueKey('$label-$safeValue'),
       initialValue: safeValue,
       isExpanded: true,
+      dropdownColor: const Color(0xFF0F172A),
+      style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13.5),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor: const Color(0xFF0F172A).withValues(alpha: 0.5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
       ),
       items: List.generate(ResistorScannerService.toleranceColors.length, (i) {
         final b = ResistorScannerService.toleranceColors[i];
@@ -1623,10 +1627,17 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       key: ValueKey('$label-$safeValue'),
       initialValue: safeValue,
       isExpanded: true,
+      dropdownColor: const Color(0xFF0F172A),
+      style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13.5),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor: const Color(0xFF0F172A).withValues(alpha: 0.5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
       ),
       items: List.generate(ResistorScannerService.tempCoColors.length, (i) {
         final b = ResistorScannerService.tempCoColors[i];

@@ -4,34 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Scope providing ambient waveform progress and animation to descendant glass components,
-/// allowing glass bubbles to dynamically reflect, float, and react to background waves.
-class LiquidGlassScope extends InheritedWidget {
-  final double progress;
-  final Animation<double>? animation;
-
-  const LiquidGlassScope({
-    super.key,
-    required this.progress,
-    this.animation,
-    required super.child,
-  });
-
-  static LiquidGlassScope? maybeOf(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<LiquidGlassScope>();
-  }
-
-  @override
-  bool updateShouldNotify(LiquidGlassScope oldWidget) =>
-      oldWidget.progress != progress;
-}
-
 /// VisionOS & Apple Intelligence inspired Liquid Glass background featuring a dark ambient canvas
 /// with smooth, fluid harmonic sine waves radiating outward from the middle like Siri,
-/// rendered with heavy Gaussian blur for a dreamy, organic, ambient glowing atmosphere.
+/// rendered with heavy Gaussian blur for a dreamy, organic, seamless ambient glowing atmosphere.
 ///
 /// Strictly pinned to the screen viewport via a root [Stack] so that it remains
 /// static in screen space while the foreground content scrolls smoothly over it.
+///
+/// Optimized for 60 FPS performance: the animation controller only rebuilds the background
+/// CustomPaint canvas and NEVER triggers rebuilds of the foreground widget tree.
 class FuturisticBackground extends StatefulWidget {
   final Widget child;
 
@@ -68,49 +49,43 @@ class _FuturisticBackgroundState extends State<FuturisticBackground>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final progress = _controller.value;
-        return LiquidGlassScope(
-          progress: progress,
-          animation: _controller,
-          child: Stack(
-            children: [
-              // 1. Viewport-Pinned Static Animated Smooth Sine Waves Radiating From The Middle (Like Siri)
-              Positioned.fill(
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _SiriRadiatingWavesPainter(progress),
-                  ),
-                ),
+    return Stack(
+      children: [
+        // 1. Viewport-Pinned Static Animated Smooth Sine Waves Radiating From Middle (Zero-lag isolated canvas)
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) => CustomPaint(
+                painter: _SiriRadiatingWavesPainter(_controller.value),
               ),
-
-              // 2. Holographic Technical Matrix Micro-Grid
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: const RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _TechGridPainter(),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 3. Scrollable Foreground Content
-              Positioned.fill(
-                child: widget.child,
-              ),
-            ],
+            ),
           ),
-        );
-      },
+        ),
+
+        // 2. Holographic Technical Matrix Micro-Grid
+        Positioned.fill(
+          child: IgnorePointer(
+            child: const RepaintBoundary(
+              child: CustomPaint(
+                painter: _TechGridPainter(),
+              ),
+            ),
+          ),
+        ),
+
+        // 3. Foreground Content (Isolated from background animation loop for instant touch responsiveness)
+        Positioned.fill(
+          child: widget.child,
+        ),
+      ],
     );
   }
 }
 
-/// Painter for smooth fluid sine waves radiating from the middle like Siri,
+/// Painter for smooth fluid sine waves radiating seamlessly from the middle like Siri,
 /// with heavy multi-layer Gaussian blur bloom and organic harmonic undulation.
+/// The center blends seamlessly with the waves rather than looking like an obvious concentrated dot.
 class _SiriRadiatingWavesPainter extends CustomPainter {
   final double progress;
 
@@ -126,27 +101,28 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
     final maxRadius = math.max(size.width, size.height) * 0.72;
     final t = progress * 2.0 * math.pi;
 
-    // 2. Deep Ambient Chromatic Glow (Heavy blur aura in the center)
+    // 2. Soft, Seamless Ambient Chromatic Glow (Low-opacity, diffused center that blends into space)
     final ambientAuraPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF8B5CF6).withValues(alpha: 0.35), // Radiant Violet
-          const Color(0xFF00E5FF).withValues(alpha: 0.25), // Electric Cyan
-          const Color(0xFFEC4899).withValues(alpha: 0.18), // Hot Magenta
+          const Color(0xFF8B5CF6).withValues(alpha: 0.18), // Soft Violet
+          const Color(0xFF00E5FF).withValues(alpha: 0.14), // Soft Cyan
+          const Color(0xFFEC4899).withValues(alpha: 0.08), // Soft Magenta
           Colors.transparent,
         ],
-        stops: const [0.0, 0.38, 0.68, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.75));
-    canvas.drawCircle(center, maxRadius * 0.75, ambientAuraPaint);
+        stops: const [0.0, 0.40, 0.70, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: maxRadius * 0.85))
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 55.0);
+    canvas.drawCircle(center, maxRadius * 0.85, ambientAuraPaint);
 
     // 3. Smooth Concentric Sine Waves Radiating Outward from Middle (Like Siri)
-    // 6 radiating harmonic wave rings with distinct phases and heavy Gaussian blur
+    // 6 radiating harmonic wave rings with heavy Gaussian blur and seamless origin
     final wavePalette = [
-      const Color(0xFF00E5FF), // Cyan
-      const Color(0xFFA855F7), // Violet
-      const Color(0xFFEC4899), // Magenta
-      const Color(0xFF3B82F6), // Sapphire Blue
-      const Color(0xFF10B981), // Emerald
+      const Color(0xFF00E5FF), // Electric Cyan
+      const Color(0xFFA855F7), // Radiant Violet
+      const Color(0xFFEC4899), // Hot Magenta
+      const Color(0xFF3B82F6), // Royal Blue
+      const Color(0xFF14B8A6), // Electric Teal
       const Color(0xFFF59E0B), // Warm Amber
     ];
 
@@ -156,20 +132,21 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       final ringProgress = (progress + k / numRadiatingRings) % 1.0;
       final rBase = ringProgress * maxRadius;
 
-      // Opacity curve: soft fade-in near center, peaks mid-way, smooth fade-out towards boundary
+      // Soft parabolic fade: 0 at center, gentle peak mid-way, soft fade at perimeter
+      // Smoothly merges into center without creating a dense central dot
       final fade = math.sin(ringProgress * math.pi);
-      final alpha = (fade * fade * 0.42).clamp(0.0, 1.0);
+      final alpha = (fade * fade * 0.38).clamp(0.0, 1.0);
 
-      if (alpha < 0.02) continue;
+      if (alpha < 0.015) continue;
 
       final color = wavePalette[k % wavePalette.length];
       final path = Path();
-      const steps = 100;
+      const steps = 96;
 
       for (int i = 0; i <= steps; i++) {
         final theta = (i / steps) * 2.0 * math.pi;
 
-        // Smooth multi-frequency sine wave modulation rippling around each radiating ring
+        // Smooth harmonic sine waves rippling around each radiating ring
         final waveMod = 0.08 * math.sin(4.0 * theta - t * 1.5 + k * 1.2) +
                         0.04 * math.cos(7.0 * theta + t * 2.0) +
                         0.02 * math.sin(10.0 * theta - t);
@@ -187,41 +164,24 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       path.close();
 
       // Heavy Gaussian Blur Stroke for smooth, dreamy Siri glow
-      final blurAmount = 32.0 + 16.0 * ringProgress;
+      final blurAmount = 42.0 + 20.0 * ringProgress;
       final waveStrokePaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 14.0 + 10.0 * ringProgress
+        ..strokeWidth = 16.0 + 12.0 * ringProgress
         ..color = color.withValues(alpha: alpha)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurAmount);
 
       canvas.drawPath(path, waveStrokePaint);
 
-      // Core crisp harmonic line inside the blur
+      // Delicate soft harmonic core line inside the heavy blur
       final coreLinePaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
-        ..color = Colors.white.withValues(alpha: alpha * 0.65)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 6.0);
+        ..strokeWidth = 2.0
+        ..color = Colors.white.withValues(alpha: alpha * 0.40)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8.0);
 
       canvas.drawPath(path, coreLinePaint);
     }
-
-    // 4. Central Intense Glowing Siri Core (Breathing fluid center)
-    final corePulse = 1.0 + 0.16 * math.sin(t * 1.6);
-    final coreRadius = maxRadius * 0.22 * corePulse;
-    final corePaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Colors.white.withValues(alpha: 0.55),
-          const Color(0xFF00E5FF).withValues(alpha: 0.42),
-          const Color(0xFFA855F7).withValues(alpha: 0.22),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.30, 0.70, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: coreRadius))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28.0);
-
-    canvas.drawCircle(center, coreRadius, corePaint);
   }
 
   @override
@@ -257,8 +217,8 @@ class _TechGridPainter extends CustomPainter {
 /// - Calibrated grayish translucency (alpha: 0.38) providing substantial physical body.
 /// - Heavy frosted refraction via deep BackdropFilter blur (sigma: 28.0).
 /// - Clean, subtle physical glass refractive bevel rim.
-/// - ZERO fake white patches or sticker highlights.
-/// - Dynamic weightless floating oscillation reacting to the radiating background waves.
+/// - ZERO fake white patches or opaque sticker shapes.
+/// - Static GPU caching via RepaintBoundary for instant, zero-lag touch interactions.
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double borderRadius;
@@ -285,15 +245,7 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope = LiquidGlassScope.maybeOf(context);
-    final progress = scope?.progress ?? 0.0;
-
-    // Subtle weightless floating oscillation (physically integrated liquid glass bubble)
-    final floatY = scope != null
-        ? math.sin(progress * 2.0 * math.pi) * 2.0
-        : 0.0;
-
-    // Decreased transparency: substantial grayish translucent liquid glass (alpha: 0.38)
+    // Substantial grayish translucent liquid glass (alpha: 0.38)
     final effectiveTint =
         tintColor ?? const Color(0xFF0F172A).withValues(alpha: 0.38);
 
@@ -306,10 +258,10 @@ class GlassContainer extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.09),
-            const Color(0xFF64748B).withValues(alpha: 0.04),
+            Colors.white.withValues(alpha: 0.08),
+            const Color(0xFF64748B).withValues(alpha: 0.03),
             Colors.transparent,
-            const Color(0xFF1E293B).withValues(alpha: 0.08),
+            const Color(0xFF1E293B).withValues(alpha: 0.07),
           ],
           stops: const [0.0, 0.30, 0.70, 1.0],
         ),
@@ -330,78 +282,66 @@ class GlassContainer extends StatelessWidget {
       );
     }
 
-    Widget bubble = Container(
-      margin: margin,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          // Soft ambient occlusion shadow
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-          // Subtle neutral glass edge reflection (breathing slightly with ambient waveform)
-          BoxShadow(
-            color: Colors.white.withValues(
-                alpha: 0.03 + 0.015 * math.sin(progress * 2.0 * math.pi)),
-            blurRadius: 26,
-            spreadRadius: -2,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: kIsWeb
-            ? CustomPaint(
-                foregroundPainter: _RealLiquidGlassBorderPainter(
-                  borderRadius: borderRadius,
-                  borderWidth: borderWidth,
-                  progress: progress,
-                ),
-                child: content,
-              )
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-                child: CustomPaint(
+    return RepaintBoundary(
+      child: Container(
+        margin: margin,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(borderRadius),
+          boxShadow: [
+            // Soft ambient occlusion shadow
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 28,
+              offset: const Offset(0, 12),
+            ),
+            // Subtle neutral glass edge reflection
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.03),
+              blurRadius: 24,
+              spreadRadius: -2,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: kIsWeb
+              ? CustomPaint(
                   foregroundPainter: _RealLiquidGlassBorderPainter(
                     borderRadius: borderRadius,
                     borderWidth: borderWidth,
-                    progress: progress,
                   ),
                   child: content,
+                )
+              : BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+                  child: CustomPaint(
+                    foregroundPainter: _RealLiquidGlassBorderPainter(
+                      borderRadius: borderRadius,
+                      borderWidth: borderWidth,
+                    ),
+                    child: content,
+                  ),
                 ),
-              ),
+        ),
       ),
     );
-
-    if (floatY != 0.0) {
-      bubble = Transform.translate(
-        offset: Offset(0, floatY),
-        child: bubble,
-      );
-    }
-
-    return RepaintBoundary(child: bubble);
   }
 }
 
 /// Custom painter for Authentic Real Liquid Glass refractive borders.
 ///
 /// Features clean, realistic glass refraction bevels:
-/// - 45° specular rim catch that dynamically reflects the ambient light angle.
+/// - Clean silver-white 45° light catch on the outer edge.
 /// - Micro-inward secondary refraction bevel stroke simulating real glass thickness.
 /// - NO fake white patches or opaque sticker shapes.
 class _RealLiquidGlassBorderPainter extends CustomPainter {
   final double borderRadius;
   final double borderWidth;
-  final double progress;
 
   const _RealLiquidGlassBorderPainter({
     required this.borderRadius,
     required this.borderWidth,
-    this.progress = 0.0,
   });
 
   @override
@@ -409,22 +349,18 @@ class _RealLiquidGlassBorderPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
 
-    // Dynamic light direction reacting to the radiating background waves
-    final lightX = -0.7 + 0.3 * math.cos(progress * 2.0 * math.pi * 0.5);
-    final lightY = -0.8 + 0.2 * math.sin(progress * 2.0 * math.pi * 0.5);
-
     // 1. Primary Outer Refractive Specular Rim (Clean silver-white light catch)
     final primaryPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = borderWidth
       ..shader = LinearGradient(
-        begin: Alignment(lightX, lightY),
-        end: Alignment(lightX + 1.4, lightY + 1.6),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.55),
-          const Color(0xFFCBD5E1).withValues(alpha: 0.25),
+          Colors.white.withValues(alpha: 0.50),
+          const Color(0xFFCBD5E1).withValues(alpha: 0.22),
           Colors.white.withValues(alpha: 0.05),
-          const Color(0xFF94A3B8).withValues(alpha: 0.15),
+          const Color(0xFF94A3B8).withValues(alpha: 0.12),
         ],
         stops: const [0.0, 0.25, 0.65, 1.0],
       ).createShader(rect);
@@ -445,7 +381,7 @@ class _RealLiquidGlassBorderPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: 0.20),
+            Colors.white.withValues(alpha: 0.18),
             Colors.transparent,
           ],
           stops: const [0.0, 0.35],
@@ -458,8 +394,7 @@ class _RealLiquidGlassBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RealLiquidGlassBorderPainter oldDelegate) =>
       oldDelegate.borderRadius != borderRadius ||
-      oldDelegate.borderWidth != borderWidth ||
-      oldDelegate.progress != progress;
+      oldDelegate.borderWidth != borderWidth;
 }
 
 /// VisionOS & Liquid Glass style Rounded Capsule Pill.

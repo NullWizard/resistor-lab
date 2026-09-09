@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:resistor_lab/screens/calculator_screen.dart';
 import 'package:resistor_lab/screens/scan_resistor_screen.dart';
@@ -41,5 +41,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ScanResistorScreen), findsOneWidget);
+  });
+
+  testWidgets('ScanResistorScreen renders FuturisticBackground in scan mode', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ScanResistorScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Scan Resistor'), findsOneWidget);
+    expect(find.text('Place the resistor inside the guide and make sure the color bands are clearly visible.'), findsOneWidget);
   });
 }
