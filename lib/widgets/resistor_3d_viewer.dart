@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'glass_components.dart';
 
 /// Enum representing the kinds of 3D resistor models available.
@@ -94,7 +95,7 @@ class Face3D {
   }
 }
 
-/// A 3D line segment (e.g. for leads or coils).
+/// A 3D line segment (e.g. for leads, coils, or tracks).
 class Line3D {
   final Vector3 start;
   final Vector3 end;
@@ -112,20 +113,23 @@ class Line3D {
 }
 
 /// Interactive 3D Resistor Model Viewer widget.
+///
+/// Optimized for silky smooth 60fps performance on both Web and Mobile:
+/// - Static high-fidelity perspective rendering by default in cards (0 CPU overhead).
+/// - Instant real-time 3D rotation on mouse/touch drag.
+/// - Full 360° CAD Inspector dialog with orbital rotation and zoom.
 class Resistor3DViewer extends StatefulWidget {
   final Resistor3DType type;
   final double height;
   final bool enableGesture;
-  final bool autoRotate;
   final bool showInspectButton;
   final String? title;
 
   const Resistor3DViewer({
     super.key,
     required this.type,
-    this.height = 160,
+    this.height = 165,
     this.enableGesture = true,
-    this.autoRotate = true,
     this.showInspectButton = true,
     this.title,
   });
@@ -134,43 +138,14 @@ class Resistor3DViewer extends StatefulWidget {
   State<Resistor3DViewer> createState() => _Resistor3DViewerState();
 }
 
-class _Resistor3DViewerState extends State<Resistor3DViewer>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  double _yaw = 0.45;
-  double _pitch = -0.30;
-  bool _isInteracting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 12),
-    )..addListener(() {
-        if (widget.autoRotate && !_isInteracting) {
-          setState(() {
-            _yaw += 0.008;
-            if (_yaw > math.pi * 2) _yaw -= math.pi * 2;
-          });
-        }
-      });
-
-    if (widget.autoRotate) {
-      _animController.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
+class _Resistor3DViewerState extends State<Resistor3DViewer> {
+  double _yaw = 0.50;
+  double _pitch = -0.28;
 
   void _openInspectionDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.75),
+      barrierColor: Colors.black.withValues(alpha: 0.85),
       builder: (ctx) => _Resistor3DInspectorDialog(
         type: widget.type,
         title: widget.title ?? _getResistorName(widget.type),
@@ -180,139 +155,182 @@ class _Resistor3DViewerState extends State<Resistor3DViewer>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: widget.height,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xFF070B14).withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF00E5FF).withValues(alpha: 0.20),
-          width: 1,
+    return RepaintBoundary(
+      child: Container(
+        height: widget.height,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color(0xFF070C18).withValues(alpha: 0.90),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.12),
+              Colors.white.withValues(alpha: 0.02),
+              const Color(0xFF00E5FF).withValues(alpha: 0.05),
+            ],
+            stops: const [0.0, 0.35, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.50),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ),
-      child: Stack(
-        children: [
-          // Subtle holographic viewport grid
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _ViewportGridPainter(),
-            ),
-          ),
-
-          // Interactive 3D Model Viewport
-          Positioned.fill(
-            child: GestureDetector(
-              onPanStart: (_) {
-                if (widget.enableGesture) setState(() => _isInteracting = true);
-              },
-              onPanUpdate: (details) {
-                if (widget.enableGesture) {
-                  setState(() {
-                    _yaw += details.delta.dx * 0.015;
-                    _pitch = (_pitch - details.delta.dy * 0.015)
-                        .clamp(-math.pi / 2.2, math.pi / 2.2);
-                  });
-                }
-              },
-              onPanEnd: (_) {
-                if (widget.enableGesture) setState(() => _isInteracting = false);
-              },
-              onDoubleTap: () {
-                setState(() {
-                  _yaw = 0.45;
-                  _pitch = -0.30;
-                });
-              },
+        child: Stack(
+          children: [
+            // Subtle holographic viewport grid
+            Positioned.fill(
               child: CustomPaint(
-                painter: _Resistor3DPainter(
-                  type: widget.type,
-                  yaw: _yaw,
-                  pitch: _pitch,
-                  zoom: 1.0,
-                ),
+                painter: _ViewportGridPainter(),
               ),
             ),
-          ),
 
-          // Top-Left CAD Tag
-          Positioned(
-            top: 8,
-            left: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.30),
-                  width: 0.8,
-                ),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.view_in_ar_rounded, size: 12, color: Color(0xFF00E5FF)),
-                  SizedBox(width: 4),
-                  Text(
-                    '3D CAD MODEL',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00E5FF),
-                      letterSpacing: 0.5,
-                    ),
+            // Interactive 3D Model Viewport (touch/mouse drag)
+            Positioned.fill(
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  if (widget.enableGesture) {
+                    setState(() {
+                      _yaw += details.delta.dx * 0.018;
+                      _pitch = (_pitch - details.delta.dy * 0.018)
+                          .clamp(-math.pi / 2.2, math.pi / 2.2);
+                    });
+                  }
+                },
+                onDoubleTap: () {
+                  setState(() {
+                    _yaw = 0.50;
+                    _pitch = -0.28;
+                  });
+                },
+                child: CustomPaint(
+                  painter: _Resistor3DPainter(
+                    type: widget.type,
+                    yaw: _yaw,
+                    pitch: _pitch,
+                    zoom: 1.05,
                   ),
-                ],
+                ),
               ),
             ),
-          ),
 
-          // Bottom-Right Inspect / Fullscreen Button
-          if (widget.showInspectButton)
+            // Top-Left CAD Tag
             Positioned(
-              bottom: 8,
-              right: 8,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _openInspectionDialog(context),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.20),
+              top: 8,
+              left: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.20),
+                      blurRadius: 8,
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.view_in_ar_rounded, size: 12, color: Color(0xFF00E5FF)),
+                    const SizedBox(width: 5),
+                    Text(
+                      '3D CAD MODEL',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF00E5FF),
+                        letterSpacing: 0.6,
                       ),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.open_in_full_rounded, size: 12, color: Color(0xFFCBD5E1)),
-                        SizedBox(width: 4),
-                        Text(
-                          'Inspect 3D',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFCBD5E1),
-                          ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Top-Right Drag Hint
+            Positioned(
+              top: 10,
+              right: 12,
+              child: Text(
+                'DRAG TO ROTATE',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF94A3B8),
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+
+            // Bottom-Right Inspect / Fullscreen Button
+            if (widget.showInspectButton)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _openInspectionDialog(context),
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+                          width: 1.1,
                         ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.20),
+                            blurRadius: 10,
+                            spreadRadius: -2,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.open_in_full_rounded, size: 12, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Inspect 3D',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFF8FAFC),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Full screen interactive 3D model inspection dialog.
+/// Full-screen high-resolution 3D model inspection dialog.
 class _Resistor3DInspectorDialog extends StatefulWidget {
   final Resistor3DType type;
   final String title;
@@ -327,10 +345,36 @@ class _Resistor3DInspectorDialog extends StatefulWidget {
       _Resistor3DInspectorDialogState();
 }
 
-class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> {
-  double _yaw = 0.5;
-  double _pitch = -0.3;
-  double _zoom = 1.35;
+class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _rotationAnim;
+  double _yaw = 0.50;
+  double _pitch = -0.28;
+  double _zoom = 1.45;
+  bool _autoRotate = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..addListener(() {
+        if (_autoRotate) {
+          setState(() {
+            _yaw += 0.009;
+            if (_yaw > math.pi * 2) _yaw -= math.pi * 2;
+          });
+        }
+      });
+    _rotationAnim.repeat();
+  }
+
+  @override
+  void dispose() {
+    _rotationAnim.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -338,7 +382,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(16),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 620),
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 650),
         child: GlassContainer(
           borderRadius: 24,
           padding: const EdgeInsets.all(20),
@@ -361,7 +405,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
                     child: const Icon(
                       Icons.view_in_ar_rounded,
                       color: Color(0xFF00E5FF),
-                      size: 20,
+                      size: 22,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -371,18 +415,18 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
                       children: [
                         Text(
                           widget.title,
-                          style: const TextStyle(
-                            fontSize: 17,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 17.5,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFF8FAFC),
+                            color: const Color(0xFFF8FAFC),
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          'Interactive 360° Structural Inspection',
-                          style: TextStyle(
+                        Text(
+                          'Full 360° Structural CAD Inspection',
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
-                            color: Color(0xFF94A3B8),
+                            color: const Color(0xFF94A3B8),
                           ),
                         ),
                       ],
@@ -418,6 +462,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
                       // Gesture Detector
                       Positioned.fill(
                         child: GestureDetector(
+                          onPanStart: (_) => setState(() => _autoRotate = false),
                           onPanUpdate: (details) {
                             setState(() {
                               _yaw += details.delta.dx * 0.015;
@@ -436,24 +481,71 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
                         ),
                       ),
 
-                      // HUD Overlay
+                      // Real-time CAD Coordinates HUD
                       Positioned(
                         top: 10,
                         right: 12,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A).withValues(alpha: 0.7),
+                            color: const Color(0xFF0F172A).withValues(alpha: 0.75),
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: const Color(0xFF334155)),
                           ),
                           child: Text(
                             'YAW: ${(_yaw * 180 / math.pi % 360).round()}° | PITCH: ${(_pitch * 180 / math.pi).round()}°',
-                            style: const TextStyle(
-                              fontFamily: 'Courier',
+                            style: GoogleFonts.jetBrainsMono(
                               fontSize: 10,
-                              color: Color(0xFF00E5FF),
+                              color: const Color(0xFF00E5FF),
                               fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Auto-Rotate Button
+                      Positioned(
+                        bottom: 10,
+                        left: 12,
+                        child: InkWell(
+                          onTap: () => setState(() => _autoRotate = !_autoRotate),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _autoRotate
+                                  ? const Color(0xFF00E5FF).withValues(alpha: 0.2)
+                                  : const Color(0xFF0F172A).withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: _autoRotate
+                                    ? const Color(0xFF00E5FF)
+                                    : const Color(0xFF334155),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _autoRotate
+                                      ? Icons.motion_photos_on_rounded
+                                      : Icons.motion_photos_off_rounded,
+                                  size: 13,
+                                  color: _autoRotate
+                                      ? const Color(0xFF00E5FF)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _autoRotate ? 'Orbit: ON' : 'Orbit: OFF',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _autoRotate
+                                        ? const Color(0xFF00E5FF)
+                                        : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -464,7 +556,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
               ),
               const SizedBox(height: 14),
 
-              // Controls & Zoom Slider
+              // Zoom Controls
               Row(
                 children: [
                   const Icon(Icons.zoom_out_rounded, size: 18, color: Color(0xFF94A3B8)),
@@ -480,7 +572,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
                       child: Slider(
                         value: _zoom,
                         min: 0.8,
-                        max: 2.2,
+                        max: 2.3,
                         onChanged: (v) => setState(() => _zoom = v),
                       ),
                     ),
@@ -490,13 +582,14 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
                   OutlinedButton.icon(
                     onPressed: () {
                       setState(() {
-                        _yaw = 0.5;
-                        _pitch = -0.3;
-                        _zoom = 1.35;
+                        _yaw = 0.50;
+                        _pitch = -0.28;
+                        _zoom = 1.45;
+                        _autoRotate = true;
                       });
                     },
                     icon: const Icon(Icons.restart_alt_rounded, size: 16),
-                    label: const Text('Reset', style: TextStyle(fontSize: 12)),
+                    label: Text('Reset', style: GoogleFonts.spaceGrotesk(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFCBD5E1),
                       side: const BorderSide(color: Color(0xFF334155)),
@@ -507,24 +600,24 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
               ),
               const SizedBox(height: 8),
 
-              // Technical Callout
+              // Structural Callout
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0B132B).withValues(alpha: 0.5),
+                  color: const Color(0xFF0B132B).withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFF1E293B)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.touch_app_rounded, size: 16, color: Color(0xFF00E5FF)),
+                    const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF00E5FF)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _getResistorCallout(widget.type),
-                        style: const TextStyle(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
-                          color: Color(0xFFCBD5E1),
+                          color: const Color(0xFFCBD5E1),
                         ),
                       ),
                     ),
@@ -539,17 +632,14 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog> 
   }
 }
 
-/// Canvas painter for the 3D resistor model.
+/// Canvas painter for realistic 3D component rendering with Phong specular highlights.
 class _Resistor3DPainter extends CustomPainter {
   final Resistor3DType type;
   final double yaw;
   final double pitch;
   final double zoom;
 
-  // Camera focal length for perspective projection
   static const double focalLength = 320.0;
-
-  // Directional Light Vector (normalized, pointing towards scene)
   static final Vector3 lightDir = const Vector3(-0.4, -0.7, 0.6).normalized;
 
   _Resistor3DPainter({
@@ -566,15 +656,14 @@ class _Resistor3DPainter extends CustomPainter {
     final faces = <Face3D>[];
     final lines = <Line3D>[];
 
-    // Build the 3D geometry based on the component type
+    // Build the realistic 3D geometry
     _generateGeometry(faces, lines);
 
-    // Transform vertices: Rotate pitch, then yaw, then scale
+    // Transform vertices
     final transformedFaces = <Face3D>[];
     for (final face in faces) {
       final tVerts = face.vertices.map((v) {
-        final rot = v.rotateX(pitch).rotateY(yaw) * zoom;
-        return rot;
+        return v.rotateX(pitch).rotateY(yaw) * zoom;
       }).toList();
 
       transformedFaces.add(Face3D(
@@ -598,7 +687,7 @@ class _Resistor3DPainter extends CustomPainter {
       ));
     }
 
-    // Combine renderable objects for Painter's Algorithm sorting
+    // Combine for Painter's Algorithm sorting
     final renderables = <_Renderable>[];
     for (final face in transformedFaces) {
       renderables.add(_Renderable(z: face.avgZ, face: face));
@@ -607,7 +696,7 @@ class _Resistor3DPainter extends CustomPainter {
       renderables.add(_Renderable(z: line.avgZ, line: line));
     }
 
-    // Sort back-to-front (smaller Z is farther away, larger Z is closer to camera)
+    // Sort back-to-front
     renderables.sort((a, b) => a.z.compareTo(b.z));
 
     // Render sorted elements
@@ -636,7 +725,6 @@ class _Resistor3DPainter extends CustomPainter {
   void _renderFace(Canvas canvas, Offset center, Face3D face) {
     if (face.vertices.length < 3) return;
 
-    // Normal calculation for lighting
     final v0 = face.vertices[0];
     final v1 = face.vertices[1];
     final v2 = face.vertices[2];
@@ -645,16 +733,12 @@ class _Resistor3DPainter extends CustomPainter {
     final edge2 = v2 - v0;
     final normal = edge1.cross(edge2).normalized;
 
-    // Back-face culling for solid meshes
-    // If normal points away from viewer (normal.z <= 0) and not wireframe, we can still render or cull.
-    // For transparent/open meshes, we allow both sides.
-
     Color renderColor = face.baseColor;
     if (face.isShaded) {
-      final diffuse = math.max(0.25, normal.dot(lightDir));
+      final diffuse = math.max(0.28, normal.dot(lightDir));
       final spec = face.isMetallic
-          ? math.pow(math.max(0.0, normal.dot(lightDir)), 6) * 0.45
-          : 0.0;
+          ? math.pow(math.max(0.0, normal.dot(lightDir)), 7) * 0.55
+          : math.pow(math.max(0.0, normal.dot(lightDir)), 4) * 0.22;
 
       final baseR = (face.baseColor.r * 255.0).round();
       final baseG = (face.baseColor.g * 255.0).round();
@@ -684,7 +768,7 @@ class _Resistor3DPainter extends CustomPainter {
     // Subtle edge highlight for 3D definition
     if (!face.isWireframe && face.vertices.length <= 4) {
       final borderPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.18)
+        ..color = Colors.black.withValues(alpha: 0.15)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.5;
       canvas.drawPath(path, borderPaint);
@@ -692,36 +776,38 @@ class _Resistor3DPainter extends CustomPainter {
   }
 
   Offset _project(Offset center, Vector3 v) {
-    // Standard perspective projection formula
     final scale = focalLength / (focalLength + v.z);
     return Offset(center.dx + v.x * scale, center.dy + v.y * scale);
   }
 
-  /// Builds true 3D meshes for each of the 12 resistor kinds.
+  // ===========================================================================
+  // REALISTIC 3D COMPONENT GENERATORS
+  // ===========================================================================
+
   void _generateGeometry(List<Face3D> faces, List<Line3D> lines) {
     switch (type) {
       case Resistor3DType.carbonComposition:
-        _buildAxialResistor(
+        _buildContouredAxialResistor(
           faces,
           lines,
-          bodyColor: const Color(0xFF2C241E), // Dark phenolic charcoal
+          bodyColor: const Color(0xFF332A24), // Dark phenolic charcoal
           bands: [
-            const Color(0xFF8B5A2B), // Brown
+            const Color(0xFF9A5B2D), // Brown
             Colors.black,            // Black
-            const Color(0xFFFFA500), // Orange
+            const Color(0xFFFF9800), // Orange
             const Color(0xFFFFD700), // Gold
           ],
         );
         break;
 
       case Resistor3DType.carbonFilm:
-        _buildAxialResistor(
+        _buildContouredAxialResistor(
           faces,
           lines,
-          bodyColor: const Color(0xFFD6B27C), // Tan / Beige ceramic
+          bodyColor: const Color(0xFFD4B07B), // Warm beige ceramic
           hasHelicalGroove: true,
           bands: [
-            const Color(0xFF8B5A2B), // Brown
+            const Color(0xFF9A5B2D), // Brown
             Colors.black,            // Black
             const Color(0xFFE53935), // Red
             const Color(0xFFFFD700), // Gold
@@ -730,16 +816,16 @@ class _Resistor3DPainter extends CustomPainter {
         break;
 
       case Resistor3DType.metalFilm:
-        _buildAxialResistor(
+        _buildContouredAxialResistor(
           faces,
           lines,
           bodyColor: const Color(0xFF0284C7), // High precision sky-blue
           bands: [
-            const Color(0xFF8B5A2B), // Brown
+            const Color(0xFF9A5B2D), // Brown
             Colors.black,            // Black
             Colors.black,            // Black
-            const Color(0xFF8B5A2B), // Brown
-            const Color(0xFF8B5A2B), // Brown (1%)
+            const Color(0xFF9A5B2D), // Brown
+            const Color(0xFF9A5B2D), // Brown (1%)
           ],
         );
         break;
@@ -782,225 +868,262 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  // ===========================================================================
-  // 3D GEOMETRY GENERATORS
-  // ===========================================================================
-
-  /// 1. Axial Resistor (Carbon Comp, Carbon Film, Metal Film)
-  void _buildAxialResistor(
+  /// 1. Realistic Contoured Axial Resistor (Dogbone flared shoulders, metallic leads, shine)
+  void _buildContouredAxialResistor(
     List<Face3D> faces,
     List<Line3D> lines, {
     required Color bodyColor,
     required List<Color> bands,
     bool hasHelicalGroove = false,
   }) {
-    const radius = 18.0;
     const halfLen = 42.0;
     const segments = 16;
 
-    // Metallic Leads extending out both ends
+    // Metallic Axial Wire Leads (silver-tinned copper)
     lines.add(Line3D(
-      start: const Vector3(-halfLen - 50, 0, 0),
+      start: const Vector3(-halfLen - 55, 0, 0),
       end: const Vector3(-halfLen, 0, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.5,
+      color: const Color(0xFFE2E8F0),
+      strokeWidth: 4.0,
     ));
     lines.add(Line3D(
       start: const Vector3(halfLen, 0, 0),
-      end: const Vector3(halfLen + 50, 0, 0),
-      color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.5,
+      end: const Vector3(halfLen + 55, 0, 0),
+      color: const Color(0xFFE2E8F0),
+      strokeWidth: 4.0,
     ));
 
-    // End caps (silver metallic caps)
-    _buildCylinder(faces, const Vector3(-halfLen - 4, 0, 0), 4, radius + 1, segments,
-        const Color(0xFF94A3B8), isMetallic: true);
-    _buildCylinder(faces, const Vector3(halfLen, 0, 0), 4, radius + 1, segments,
-        const Color(0xFF94A3B8), isMetallic: true);
+    // Metallic Solder Caps at entry
+    _buildCylinder(faces, const Vector3(-halfLen - 5, 0, 0), 5, 6, segments,
+        const Color(0xFFCBD5E1), isMetallic: true);
+    _buildCylinder(faces, const Vector3(halfLen, 0, 0), 5, 6, segments,
+        const Color(0xFFCBD5E1), isMetallic: true);
 
-    // Main Body Cylinder
-    _buildCylinder(faces, const Vector3(-halfLen, 0, 0), halfLen * 2, radius,
+    // Left Flared Shoulder (Dogbone end)
+    _buildTaperedCylinder(
+      faces,
+      const Vector3(-halfLen, 0, 0),
+      12.0,
+      radius1: 14.0,
+      radius2: 19.5,
+      segments: segments,
+      color: bodyColor,
+    );
+
+    // Center Body Cylinder
+    _buildCylinder(faces, const Vector3(-halfLen + 12, 0, 0), 60.0, 18.0,
         segments, bodyColor);
 
-    // Color Bands
-    final bandWidth = halfLen * 2 / (bands.length + 3);
+    // Right Flared Shoulder (Dogbone end)
+    _buildTaperedCylinder(
+      faces,
+      const Vector3(halfLen - 12, 0, 0),
+      12.0,
+      radius1: 18.0,
+      radius2: 14.0,
+      segments: segments,
+      color: bodyColor,
+    );
+
+    // Precision Color Bands
+    final totalBandSpan = 52.0;
+    final bandSpacing = totalBandSpan / (bands.length + 1);
     for (int i = 0; i < bands.length; i++) {
-      final startX = -halfLen + 8.0 + i * (bandWidth + 5.0);
-      _buildCylinder(faces, Vector3(startX, 0, 0), 4.5, radius + 0.5, segments,
+      final startX = -halfLen + 16.0 + i * bandSpacing;
+      _buildCylinder(faces, Vector3(startX, 0, 0), 4.8, 18.6, segments,
           bands[i], isShaded: true);
+
+      // Fine metallic border divider rings
+      lines.add(Line3D(
+        start: Vector3(startX, 18.6, 0),
+        end: Vector3(startX, -18.6, 0),
+        color: Colors.black.withValues(alpha: 0.3),
+        strokeWidth: 1.0,
+      ));
     }
 
-    // Helical groove for Carbon Film
+    // Helical Spiral Cut for Carbon Film Resistor
     if (hasHelicalGroove) {
-      for (double x = -halfLen + 10; x < halfLen - 10; x += 1.5) {
-        final angle = (x * 0.4);
-        final p = Vector3(x, math.cos(angle) * (radius + 0.8),
-            math.sin(angle) * (radius + 0.8));
+      for (double x = -halfLen + 16; x < halfLen - 16; x += 1.8) {
+        final angle = (x * 0.45);
+        final p = Vector3(x, math.cos(angle) * 19.0, math.sin(angle) * 19.0);
         lines.add(Line3D(
           start: p,
-          end: p + const Vector3(1.2, 0.5, 0.5),
-          color: const Color(0xFF451A03),
-          strokeWidth: 1.5,
+          end: p + const Vector3(1.4, 0.6, 0.6),
+          color: const Color(0xFF451A03), // Spiral cut groove
+          strokeWidth: 2.0,
         ));
       }
     }
   }
 
-  /// 2. Wire Wound Resistor with visible 3D coils
+  /// 2. Wire Wound Resistor with visible metallic Nichrome coils
   void _buildWireWoundResistor(List<Face3D> faces, List<Line3D> lines) {
     const radius = 22.0;
-    const length = 90.0;
+    const length = 92.0;
     const segments = 16;
 
-    // Heavy Leads
+    // Heavy Tinned Axial Leads
     lines.add(Line3D(
-      start: const Vector3(-length / 2 - 45, 0, 0),
+      start: const Vector3(-length / 2 - 50, 0, 0),
       end: const Vector3(-length / 2, 0, 0),
-      color: const Color(0xFFE2E8F0),
+      color: const Color(0xFFF1F5F9),
       strokeWidth: 4.5,
     ));
     lines.add(Line3D(
       start: const Vector3(length / 2, 0, 0),
-      end: const Vector3(length / 2 + 45, 0, 0),
-      color: const Color(0xFFE2E8F0),
+      end: const Vector3(length / 2 + 50, 0, 0),
+      color: const Color(0xFFF1F5F9),
       strokeWidth: 4.5,
     ));
 
-    // Ceramic Core Cylinder
+    // Ceramic Porcelain Core Cylinder
     _buildCylinder(faces, Vector3(-length / 2, 0, 0), length, radius, segments,
-        const Color(0xFFF1F5F9));
+        const Color(0xFFF8FAFC));
 
-    // Protective vitreous enamel ends
-    _buildCylinder(faces, Vector3(-length / 2, 0, 0), 12, radius + 1.5, segments,
-        const Color(0xFF15803D));
-    _buildCylinder(faces, Vector3(length / 2 - 12, 0, 0), 12, radius + 1.5, segments,
-        const Color(0xFF15803D));
+    // Vitreous protective enamel coating collars (green)
+    _buildCylinder(faces, Vector3(-length / 2, 0, 0), 14, radius + 1.5, segments,
+        const Color(0xFF166534), isMetallic: true);
+    _buildCylinder(faces, Vector3(length / 2 - 14, 0, 0), 14, radius + 1.5, segments,
+        const Color(0xFF166534), isMetallic: true);
 
-    // Coiled Wire Windings around the core
-    const coils = 16;
+    // Realistic Coiled Wire Windings
+    const coils = 18;
     for (int i = 0; i < coils; i++) {
-      final x = -length / 2 + 14 + i * ((length - 28) / coils);
+      final x = -length / 2 + 16 + i * ((length - 32) / coils);
       for (int s = 0; s < segments; s++) {
         final a1 = (s / segments) * 2 * math.pi;
         final a2 = ((s + 1) / segments) * 2 * math.pi;
         lines.add(Line3D(
           start: Vector3(x, math.cos(a1) * (radius + 1.2), math.sin(a1) * (radius + 1.2)),
-          end: Vector3(x + 1.2, math.cos(a2) * (radius + 1.2), math.sin(a2) * (radius + 1.2)),
+          end: Vector3(x + 1.4, math.cos(a2) * (radius + 1.2), math.sin(a2) * (radius + 1.2)),
           color: const Color(0xFFD97706), // Nichrome copper alloy
-          strokeWidth: 2.2,
+          strokeWidth: 2.4,
         ));
       }
     }
   }
 
-  /// 3. Potentiometer (Rotary Pot)
+  /// 3. Potentiometer (Stamped housing, threaded brass collar, hex nut, rotating shaft, 3 lugs)
   void _buildPotentiometer(List<Face3D> faces, List<Line3D> lines) {
     // Metal Round Body
-    _buildCylinder(faces, const Vector3(0, -10, -15), 30, 32, 16,
+    _buildCylinder(faces, const Vector3(0, -10, -16), 32, 32, 16,
         const Color(0xFF64748B), isMetallic: true);
 
-    // Threaded Bushing Collar
-    _buildCylinder(faces, const Vector3(0, -10, 15), 18, 14, 16,
-        const Color(0xFF94A3B8), isMetallic: true);
-
-    // Rotating Shaft
-    _buildCylinder(faces, const Vector3(0, -10, 33), 32, 8, 12,
+    // Hexagonal Locking Nut (6-sided 3D prism)
+    _buildCylinder(faces, const Vector3(0, -10, 16), 6, 20, 6,
         const Color(0xFFE2E8F0), isMetallic: true);
 
-    // 3 Terminal Solder Lugs (Bottom)
+    // Threaded Brass Collar Bushing
+    _buildCylinder(faces, const Vector3(0, -10, 22), 16, 13, 16,
+        const Color(0xFFCA8A04), isMetallic: true);
+
+    // Rotating Shaft with flat notch
+    _buildCylinder(faces, const Vector3(0, -10, 38), 30, 8, 12,
+        const Color(0xFFE2E8F0), isMetallic: true);
+
+    // Shaft Flat notch line
+    lines.add(Line3D(
+      start: const Vector3(-5, -10, 68),
+      end: const Vector3(5, -10, 68),
+      color: const Color(0xFF0F172A),
+      strokeWidth: 2.0,
+    ));
+
+    // 3 Stamped Terminal Solder Lugs (Bottom) with Eyelets
     for (int i = -1; i <= 1; i++) {
       final x = i * 16.0;
-      _buildBox(faces, Vector3(x - 3, 22, -15), const Vector3(6, 26, 3),
+      _buildBox(faces, Vector3(x - 3.5, 22, -14), const Vector3(7, 28, 3),
           const Color(0xFFCBD5E1), isMetallic: true);
 
       // Terminal Eyelet hole outline
       lines.add(Line3D(
-        start: Vector3(x - 2, 42, -14),
-        end: Vector3(x + 2, 42, -14),
+        start: Vector3(x - 2, 44, -12),
+        end: Vector3(x + 2, 44, -12),
         color: const Color(0xFF0F172A),
-        strokeWidth: 2.0,
+        strokeWidth: 2.5,
       ));
     }
   }
 
-  /// 4. Rheostat (High-Power Variable Wirewound)
+  /// 4. Rheostat (Industrial ceramic porcelain tube, windings, guide rail, wiper carriage)
   void _buildRheostat(List<Face3D> faces, List<Line3D> lines) {
-    const length = 90.0;
+    const length = 92.0;
     const radius = 20.0;
 
-    // Ceramic Coil Tube
-    _buildCylinder(faces, Vector3(-length / 2, 5, 0), length, radius, 16,
-        const Color(0xFFE2E8F0));
+    // Ceramic Porcelain Coil Tube
+    _buildCylinder(faces, Vector3(-length / 2, 6, 0), length, radius, 16,
+        const Color(0xFFF1F5F9));
 
-    // Wire windings
-    for (double x = -length / 2 + 5; x < length / 2 - 5; x += 3.5) {
+    // Wire winding coils
+    for (double x = -length / 2 + 6; x < length / 2 - 6; x += 3.2) {
       for (int s = 0; s < 12; s++) {
         final a1 = (s / 12) * 2 * math.pi;
         final a2 = ((s + 1) / 12) * 2 * math.pi;
         lines.add(Line3D(
-          start: Vector3(x, 5 + math.cos(a1) * (radius + 0.8), math.sin(a1) * (radius + 0.8)),
-          end: Vector3(x, 5 + math.cos(a2) * (radius + 0.8), math.sin(a2) * (radius + 0.8)),
+          start: Vector3(x, 6 + math.cos(a1) * (radius + 0.8), math.sin(a1) * (radius + 0.8)),
+          end: Vector3(x, 6 + math.cos(a2) * (radius + 0.8), math.sin(a2) * (radius + 0.8)),
           color: const Color(0xFFB45309),
           strokeWidth: 1.8,
         ));
       }
     }
 
-    // Top Slide Metal Bar
+    // Top Chrome Slider Guide Rod
     lines.add(Line3D(
-      start: const Vector3(-length / 2 - 10, -22, 0),
-      end: const Vector3(length / 2 + 10, -22, 0),
-      color: const Color(0xFF94A3B8),
-      strokeWidth: 4.5,
+      start: const Vector3(-length / 2 - 12, -22, 0),
+      end: const Vector3(length / 2 + 12, -22, 0),
+      color: const Color(0xFFCBD5E1),
+      strokeWidth: 5.0,
     ));
 
-    // Wiper Contact Block & Slider Knob (centered)
-    _buildBox(faces, const Vector3(-8, -28, -8), const Vector3(16, 12, 16),
+    // Wiper Slider Carriage Block (Cyan / Blue)
+    _buildBox(faces, const Vector3(-9, -29, -9), const Vector3(18, 14, 18),
         const Color(0xFF0284C7), isMetallic: true);
-    _buildBox(faces, const Vector3(-5, -16, -4), const Vector3(10, 10, 8),
-        const Color(0xFFD97706), isMetallic: true);
 
-    // End Terminal Posts
-    _buildBox(faces, Vector3(-length / 2 - 8, 20, -5), const Vector3(8, 14, 10),
-        const Color(0xFF64748B), isMetallic: true);
-    _buildBox(faces, Vector3(length / 2, 20, -5), const Vector3(8, 14, 10),
-        const Color(0xFF64748B), isMetallic: true);
+    // Brass Wiper Contact Finger
+    _buildBox(faces, const Vector3(-5, -15, -4), const Vector3(10, 10, 8),
+        const Color(0xFFCA8A04), isMetallic: true);
+
+    // Heavy Brass Terminal Binding Posts
+    _buildCylinder(faces, Vector3(-length / 2 - 6, 22, -6), 12, 6, 8,
+        const Color(0xFFEAB308), isMetallic: true);
+    _buildCylinder(faces, Vector3(length / 2 - 6, 22, -6), 12, 6, 8,
+        const Color(0xFFEAB308), isMetallic: true);
   }
 
-  /// 5. Preset Trimmer (Trimpot)
+  /// 5. Preset Trimmer (Bourns 3296 sealed cermet trimmer)
   void _buildTrimmer(List<Face3D> faces, List<Line3D> lines) {
-    // Blue Box Body (Classic Bourns 3296)
-    _buildBox(faces, const Vector3(-25, -25, -18), const Vector3(50, 48, 36),
+    // Ultramarine Blue Casing
+    _buildBox(faces, const Vector3(-26, -26, -18), const Vector3(52, 50, 36),
         const Color(0xFF1D4ED8));
 
-    // Top Brass Adjustment Screw
-    _buildCylinder(faces, const Vector3(10, -32, 0), 7, 7, 12,
+    // Top Brass Adjustment Screw Head
+    _buildCylinder(faces, const Vector3(12, -33, 0), 7, 7, 12,
         const Color(0xFFEAB308), isMetallic: true);
 
-    // Screw Slot
+    // Cross Screw Slot (+)
     lines.add(Line3D(
-      start: const Vector3(6, -33, -5),
-      end: const Vector3(14, -33, 5),
+      start: const Vector3(8, -34, -4),
+      end: const Vector3(16, -34, 4),
+      color: const Color(0xFF713F12),
+      strokeWidth: 2.0,
+    ));
+    lines.add(Line3D(
+      start: const Vector3(12, -34, -4),
+      end: const Vector3(12, -34, 4),
       color: const Color(0xFF713F12),
       strokeWidth: 2.0,
     ));
 
-    // Dial Arrow / Markings
-    lines.add(Line3D(
-      start: const Vector3(-12, -26, -6),
-      end: const Vector3(-4, -26, 0),
-      color: Colors.white,
-      strokeWidth: 1.5,
-    ));
-
-    // 3 PCB Pins (Bottom)
+    // 3 Gold-Plated PCB Solder Pins (Bottom)
     for (int i = -1; i <= 1; i++) {
       final x = i * 14.0;
       lines.add(Line3D(
-        start: Vector3(x, 23, 0),
-        end: Vector3(x, 46, 0),
-        color: const Color(0xFFE2E8F0),
-        strokeWidth: 3.0,
+        start: Vector3(x, 24, 0),
+        end: Vector3(x, 48, 0),
+        color: const Color(0xFFFBBF24),
+        strokeWidth: 3.2,
       ));
     }
   }
@@ -1014,11 +1137,11 @@ class _Resistor3DPainter extends CustomPainter {
     _buildCylinder(faces, const Vector3(0, 0, -4), 8, radius, segments,
         const Color(0xFFE2E8F0));
 
-    // Metal Bezel Ring
+    // Gold Bezel Rim
     _buildCylinder(faces, const Vector3(0, 0, 4), 3, radius + 1, segments,
-        const Color(0xFF64748B), isMetallic: true);
+        const Color(0xFFCA8A04), isMetallic: true);
 
-    // Clear Epoxy Top Face
+    // Clear Epoxy Optical Top Face
     final topCenter = const Vector3(0, 0, 7);
     for (int i = 0; i < segments; i++) {
       final a1 = (i / segments) * 2 * math.pi;
@@ -1029,53 +1152,52 @@ class _Resistor3DPainter extends CustomPainter {
           Vector3(math.cos(a1) * radius, math.sin(a1) * radius, 7),
           Vector3(math.cos(a2) * radius, math.sin(a2) * radius, 7),
         ],
-        baseColor: const Color(0xFFFDE68A),
+        baseColor: const Color(0xFFFEF08A),
       ));
     }
 
-    // Serpentine Zigzag CdS Photoconductive Track
+    // Serpentine Zigzag CdS Photoconductive Track Pattern
     final pts = <Vector3>[
-      const Vector3(-20, -16, 7.5),
-      const Vector3(20, -16, 7.5),
-      const Vector3(20, -8, 7.5),
-      const Vector3(-20, -8, 7.5),
+      const Vector3(-20, -18, 7.5),
+      const Vector3(20, -18, 7.5),
+      const Vector3(20, -9, 7.5),
+      const Vector3(-20, -9, 7.5),
       const Vector3(-20, 0, 7.5),
       const Vector3(20, 0, 7.5),
-      const Vector3(20, 8, 7.5),
-      const Vector3(-20, 8, 7.5),
-      const Vector3(-20, 16, 7.5),
-      const Vector3(20, 16, 7.5),
+      const Vector3(20, 9, 7.5),
+      const Vector3(-20, 9, 7.5),
+      const Vector3(-20, 18, 7.5),
+      const Vector3(20, 18, 7.5),
     ];
     for (int i = 0; i < pts.length - 1; i++) {
       lines.add(Line3D(
         start: pts[i],
         end: pts[i + 1],
         color: const Color(0xFFDC2626), // Cadmium Sulfide track
-        strokeWidth: 2.5,
+        strokeWidth: 2.8,
       ));
     }
 
     // 2 Rear Leads
     lines.add(Line3D(
       start: const Vector3(-12, 0, -4),
-      end: const Vector3(-12, 0, -50),
+      end: const Vector3(-12, 0, -52),
       color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.0,
+      strokeWidth: 3.2,
     ));
     lines.add(Line3D(
       start: const Vector3(12, 0, -4),
-      end: const Vector3(12, 0, -50),
+      end: const Vector3(12, 0, -52),
       color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.0,
+      strokeWidth: 3.2,
     ));
   }
 
-  /// 7. Thermistor (NTC/PTC Dipped Bead)
+  /// 7. Thermistor (Glossy organic teardrop bead with dual leads)
   void _buildThermistor(List<Face3D> faces, List<Line3D> lines) {
     const radius = 22.0;
     const segments = 14;
 
-    // Teardrop / spherical dipped bead body
     for (int ring = 0; ring < 7; ring++) {
       final r1 = radius * math.sin((ring / 7) * math.pi);
       final r2 = radius * math.sin(((ring + 1) / 7) * math.pi);
@@ -1093,72 +1215,72 @@ class _Resistor3DPainter extends CustomPainter {
             Vector3(math.cos(a2) * r2, math.sin(a2) * r2, z2),
             Vector3(math.cos(a1) * r2, math.sin(a1) * r2, z2),
           ],
-          baseColor: const Color(0xFF0F766E), // Glossy Dark Teal epoxy
+          baseColor: const Color(0xFF0D9488), // Glossy Dark Emerald
           isMetallic: true,
         ));
       }
     }
 
-    // Two downward wire leads
+    // Kinked Wire Leads
     lines.add(Line3D(
       start: const Vector3(-7, radius - 2, 0),
-      end: const Vector3(-10, radius + 45, 0),
+      end: const Vector3(-10, radius + 46, 0),
       color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.0,
+      strokeWidth: 3.2,
     ));
     lines.add(Line3D(
       start: const Vector3(7, radius - 2, 0),
-      end: const Vector3(10, radius + 45, 0),
+      end: const Vector3(10, radius + 46, 0),
       color: const Color(0xFFCBD5E1),
-      strokeWidth: 3.0,
+      strokeWidth: 3.2,
     ));
   }
 
-  /// 8. Varistor (MOV Radial Disc)
+  /// 8. Varistor (MOV Radial Disc with Silkscreen markings)
   void _buildVaristor(List<Face3D> faces, List<Line3D> lines) {
     const radius = 34.0;
     const segments = 20;
 
-    // Disc Body (Classic Blue MOV)
+    // Disc Body (Classic High-Voltage Blue MOV)
     _buildCylinder(faces, const Vector3(0, -6, -4), 8, radius, segments,
-        const Color(0xFF1E40AF));
+        const Color(0xFF1D4ED8));
 
-    // 2 Radial Leads extending out bottom
+    // 2 Radial Leads with strain-relief crimp
     lines.add(Line3D(
       start: const Vector3(-12, radius - 6, 0),
-      end: const Vector3(-14, radius + 42, 0),
+      end: const Vector3(-14, radius + 44, 0),
       color: const Color(0xFFCBD5E1),
       strokeWidth: 3.5,
     ));
     lines.add(Line3D(
       start: const Vector3(12, radius - 6, 0),
-      end: const Vector3(14, radius + 42, 0),
+      end: const Vector3(14, radius + 44, 0),
       color: const Color(0xFFCBD5E1),
       strokeWidth: 3.5,
     ));
 
-    // Stamped component markings on front face
+    // Stamped markings silkscreen
     lines.add(Line3D(
-      start: const Vector3(-15, -12, 5),
-      end: const Vector3(15, -12, 5),
+      start: const Vector3(-16, -12, 5),
+      end: const Vector3(16, -12, 5),
       color: const Color(0xFF93C5FD),
-      strokeWidth: 1.5,
+      strokeWidth: 2.0,
     ));
     lines.add(Line3D(
-      start: const Vector3(-10, -4, 5),
-      end: const Vector3(10, -4, 5),
+      start: const Vector3(-11, -4, 5),
+      end: const Vector3(11, -4, 5),
       color: const Color(0xFF93C5FD),
-      strokeWidth: 1.5,
+      strokeWidth: 2.0,
     ));
   }
 
   /// 9. Cement Power Resistor (Ceramic Block)
   void _buildCementResistor(List<Face3D> faces, List<Line3D> lines) {
-    const length = 85.0;
+    const length = 86.0;
     const width = 28.0;
     const height = 28.0;
 
-    // White Ceramic Prism
+    // White Ceramic Prism Brick
     _buildBox(
       faces,
       Vector3(-length / 2, -height / 2, -width / 2),
@@ -1166,41 +1288,41 @@ class _Resistor3DPainter extends CustomPainter {
       const Color(0xFFF8FAFC),
     );
 
-    // Stamped Wattage / Resistance Silkscreen Text Lines
+    // Stamped wattage markings lines
     lines.add(Line3D(
-      start: const Vector3(-24, -3, width / 2 + 0.5),
-      end: const Vector3(24, -3, width / 2 + 0.5),
-      color: const Color(0xFF1E293B),
-      strokeWidth: 2.0,
+      start: const Vector3(-25, -4, width / 2 + 0.6),
+      end: const Vector3(25, -4, width / 2 + 0.6),
+      color: const Color(0xFF0F172A),
+      strokeWidth: 2.2,
     ));
     lines.add(Line3D(
-      start: const Vector3(-18, 5, width / 2 + 0.5),
-      end: const Vector3(18, 5, width / 2 + 0.5),
-      color: const Color(0xFF1E293B),
-      strokeWidth: 2.0,
+      start: const Vector3(-18, 5, width / 2 + 0.6),
+      end: const Vector3(18, 5, width / 2 + 0.6),
+      color: const Color(0xFF0F172A),
+      strokeWidth: 2.2,
     ));
 
-    // Heavy Metal Leads
+    // Heavy Tinned Leads
     lines.add(Line3D(
-      start: const Vector3(-length / 2 - 45, 0, 0),
+      start: const Vector3(-length / 2 - 46, 0, 0),
       end: const Vector3(-length / 2, 0, 0),
       color: const Color(0xFFCBD5E1),
       strokeWidth: 4.5,
     ));
     lines.add(Line3D(
       start: const Vector3(length / 2, 0, 0),
-      end: const Vector3(length / 2 + 45, 0, 0),
+      end: const Vector3(length / 2 + 46, 0, 0),
       color: const Color(0xFFCBD5E1),
       strokeWidth: 4.5,
     ));
   }
 
-  /// 10. SMD Resistor (0805 / 1206 Surface Mount Chip)
+  /// 10. SMD Resistor (0805 Surface Mount Chip)
   void _buildSMDResistor(List<Face3D> faces, List<Line3D> lines) {
-    const length = 68.0;
-    const height = 12.0;
+    const length = 70.0;
+    const height = 13.0;
     const width = 36.0;
-    const capWidth = 12.0;
+    const capWidth = 13.0;
 
     // Black Ceramic Body (Center)
     _buildBox(
@@ -1226,24 +1348,24 @@ class _Resistor3DPainter extends CustomPainter {
       isMetallic: true,
     );
 
-    // Stamped "103" (10 kΩ) 3-digit SMD code lines on top
+    // Stamped "103" SMD Code
     lines.add(Line3D(
-      start: const Vector3(-10, -height / 2 - 0.5, -6),
-      end: const Vector3(-10, -height / 2 - 0.5, 6),
+      start: const Vector3(-10, -height / 2 - 0.6, -7),
+      end: const Vector3(-10, -height / 2 - 0.6, 7),
       color: Colors.white,
-      strokeWidth: 2.0,
+      strokeWidth: 2.2,
     ));
     lines.add(Line3D(
-      start: const Vector3(0, -height / 2 - 0.5, -6),
-      end: const Vector3(0, -height / 2 - 0.5, 6),
+      start: const Vector3(0, -height / 2 - 0.6, -7),
+      end: const Vector3(0, -height / 2 - 0.6, 7),
       color: Colors.white,
-      strokeWidth: 2.0,
+      strokeWidth: 2.2,
     ));
     lines.add(Line3D(
-      start: const Vector3(10, -height / 2 - 0.5, -6),
-      end: const Vector3(10, -height / 2 - 0.5, 6),
+      start: const Vector3(10, -height / 2 - 0.6, -7),
+      end: const Vector3(10, -height / 2 - 0.6, 7),
       color: Colors.white,
-      strokeWidth: 2.0,
+      strokeWidth: 2.2,
     ));
   }
 
@@ -1251,7 +1373,6 @@ class _Resistor3DPainter extends CustomPainter {
   // 3D PRIMITIVE HELPERS
   // ===========================================================================
 
-  /// Builds a 3D polygonal cylinder along the X-axis (or specified direction).
   void _buildCylinder(
     List<Face3D> faces,
     Vector3 origin,
@@ -1290,7 +1411,6 @@ class _Resistor3DPainter extends CustomPainter {
       rightCap.add(p4);
     }
 
-    // Caps
     final leftCenter = origin;
     final rightCenter = origin + Vector3(length, 0, 0);
     for (int i = 0; i < segments; i++) {
@@ -1310,7 +1430,44 @@ class _Resistor3DPainter extends CustomPainter {
     }
   }
 
-  /// Builds a 3D box (prism) at origin with given dimensions.
+  void _buildTaperedCylinder(
+    List<Face3D> faces,
+    Vector3 origin,
+    double length, {
+    required double radius1,
+    required double radius2,
+    required int segments,
+    required Color color,
+    bool isMetallic = false,
+  }) {
+    for (int i = 0; i < segments; i++) {
+      final a1 = (i / segments) * 2 * math.pi;
+      final a2 = ((i + 1) / segments) * 2 * math.pi;
+
+      final y1a = math.cos(a1) * radius1;
+      final z1a = math.sin(a1) * radius1;
+      final y2a = math.cos(a2) * radius1;
+      final z2a = math.sin(a2) * radius1;
+
+      final y1b = math.cos(a1) * radius2;
+      final z1b = math.sin(a1) * radius2;
+      final y2b = math.cos(a2) * radius2;
+      final z2b = math.sin(a2) * radius2;
+
+      final p1 = origin + Vector3(0, y1a, z1a);
+      final p2 = origin + Vector3(0, y2a, z2a);
+      final p3 = origin + Vector3(length, y2b, z2b);
+      final p4 = origin + Vector3(length, y1b, z1b);
+
+      faces.add(Face3D(
+        vertices: [p1, p2, p3, p4],
+        baseColor: color,
+        isMetallic: isMetallic,
+        isShaded: true,
+      ));
+    }
+  }
+
   void _buildBox(
     List<Face3D> faces,
     Vector3 origin,
@@ -1327,24 +1484,12 @@ class _Resistor3DPainter extends CustomPainter {
     final v111 = origin + size;
     final v011 = origin + Vector3(0, size.y, size.z);
 
-    // Front
-    faces.add(Face3D(
-        vertices: [v001, v101, v111, v011], baseColor: color, isMetallic: isMetallic));
-    // Back
-    faces.add(Face3D(
-        vertices: [v100, v000, v010, v110], baseColor: color, isMetallic: isMetallic));
-    // Top
-    faces.add(Face3D(
-        vertices: [v000, v100, v101, v001], baseColor: color, isMetallic: isMetallic));
-    // Bottom
-    faces.add(Face3D(
-        vertices: [v010, v011, v111, v110], baseColor: color, isMetallic: isMetallic));
-    // Left
-    faces.add(Face3D(
-        vertices: [v000, v001, v011, v010], baseColor: color, isMetallic: isMetallic));
-    // Right
-    faces.add(Face3D(
-        vertices: [v100, v110, v111, v101], baseColor: color, isMetallic: isMetallic));
+    faces.add(Face3D(vertices: [v001, v101, v111, v011], baseColor: color, isMetallic: isMetallic));
+    faces.add(Face3D(vertices: [v100, v000, v010, v110], baseColor: color, isMetallic: isMetallic));
+    faces.add(Face3D(vertices: [v000, v100, v101, v001], baseColor: color, isMetallic: isMetallic));
+    faces.add(Face3D(vertices: [v010, v011, v111, v110], baseColor: color, isMetallic: isMetallic));
+    faces.add(Face3D(vertices: [v000, v001, v011, v010], baseColor: color, isMetallic: isMetallic));
+    faces.add(Face3D(vertices: [v100, v110, v111, v101], baseColor: color, isMetallic: isMetallic));
   }
 
   @override
@@ -1363,7 +1508,6 @@ class _Renderable {
   _Renderable({required this.z, this.face, this.line});
 }
 
-/// Custom painter for the futuristic holographic 3D viewport grid.
 class _ViewportGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -1379,7 +1523,6 @@ class _ViewportGridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
     }
 
-    // Corner crosshairs
     final chPaint = Paint()
       ..color = const Color(0xFF00E5FF).withValues(alpha: 0.25)
       ..strokeWidth = 1.0;
@@ -1431,28 +1574,28 @@ String _getResistorName(Resistor3DType type) {
 String _getResistorCallout(Resistor3DType type) {
   switch (type) {
     case Resistor3DType.carbonComposition:
-      return 'Drag with your finger to rotate in 360°. Observe phenolic solid core, metal end-caps, and axial lead wires.';
+      return 'Contoured flared ceramic body, tinned axial copper leads, and 4-band color coding.';
     case Resistor3DType.carbonFilm:
-      return 'Notice the helical spiral groove cut into the pure carbon film to precisely set resistance value.';
+      return 'Precision pure carbon film with a visible helical laser-cut groove to calibrate resistance.';
     case Resistor3DType.metalFilm:
-      return 'Precision laser-trimmed Nichrome film on alumina ceramic rod, featuring tight 5-band color tolerances.';
+      return 'Vacuum-sputtered Nichrome alloy film on alumina core with tight ±1% 5-band tolerance.';
     case Resistor3DType.wireWound:
-      return 'High-power Nichrome wire tightly wound around an insulated ceramic core with protective enamel coating.';
+      return 'Heavy Nichrome wire coil wound on porcelain tube with vitreous protective enamel caps.';
     case Resistor3DType.potentiometer:
-      return 'Features a rotating central control shaft, threaded mounting collar, and 3 terminal solder lugs.';
+      return 'Stamped metal housing, threaded brass collar with hex locking nut, and 3 solder eyelets.';
     case Resistor3DType.rheostat:
-      return 'High-current variable resistor with heavy wound coil, metal guide rail, and adjustable slider wiper.';
+      return 'Heavy-duty winding tube, top slider guide rod, adjustable carriage, and binding post terminals.';
     case Resistor3DType.trimmer:
-      return 'PCB trimpot with top brass adjustment screw and 3 through-hole terminal solder pins.';
+      return 'Bourns 3296 style blue cermet case with brass cross-slot adjustment screw and 3 PCB pins.';
     case Resistor3DType.ldr:
-      return 'Cadmium Sulfide (CdS) photoconductive serpentine track visible beneath clear epoxy sealing lens.';
+      return 'High-density serpentine Cadmium Sulfide (CdS) photo-conductive track beneath optical window.';
     case Resistor3DType.thermistor:
-      return 'Semiconductor ceramic bead dipped in protective epoxy with negative/positive temperature response.';
+      return 'Epoxy-dipped semiconductor ceramic bead with organic contours and dual kinked radial leads.';
     case Resistor3DType.varistor:
-      return 'Zinc-oxide radial disc designed for transient voltage surge clamping and lightning protection.';
+      return 'Zinc-oxide radial disc in high-voltage blue epoxy with silkscreen rating and radial leads.';
     case Resistor3DType.cementPower:
-      return 'Heavy-duty ceramic block filled with non-flammable cement around a wirewound core.';
+      return 'Flameproof white rectangular ceramic block with stamped wattage/tolerance and heavy leads.';
     case Resistor3DType.smd:
-      return 'Surface-mount chip resistor featuring silver end termination solder pads and numeric code silkscreen.';
+      return 'Surface-mount 0805 chip with silver/tin wrap-around solder pads and 3-digit numeric code.';
   }
 }

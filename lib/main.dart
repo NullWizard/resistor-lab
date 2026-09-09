@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/home_screen.dart';
 
 /// The entry point of the Resistor Lab application.
@@ -15,8 +16,8 @@ Future<void> main() async {
 
 /// Root widget of the Resistor Lab application.
 ///
-/// Configures a clean Material 3 academic theme suitable for
-/// a college Basic Electronics Lab demonstration.
+/// Configures a futuristic Apple visionOS / Liquid Glass theme suitable for
+/// engineering lab demonstrations and interactive 3D study.
 class ResistorLabApp extends StatelessWidget {
   const ResistorLabApp({super.key});
 
@@ -36,6 +37,16 @@ class ResistorLabApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData.dark().textTheme,
+        ).copyWith(
+          displayLarge: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, color: Colors.white),
+          displayMedium: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, color: Colors.white),
+          headlineLarge: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, letterSpacing: -0.5, color: Colors.white),
+          headlineMedium: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, letterSpacing: -0.3, color: Colors.white),
+          titleLarge: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: const Color(0xFFF8FAFC)),
+          titleMedium: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700, color: const Color(0xFFF8FAFC)),
+        ),
         colorScheme: const ColorScheme.dark(
           primary: electricCyan,
           onPrimary: Color(0xFF080D1A),
@@ -53,14 +64,14 @@ class ResistorLabApp extends StatelessWidget {
           outlineVariant: Color(0xFF334155),
         ),
         scaffoldBackgroundColor: darkBackground,
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           centerTitle: false,
           elevation: 0,
-          scrolledUnderElevation: 1,
-          backgroundColor: darkBackground,
-          foregroundColor: Color(0xFFF8FAFC),
-          titleTextStyle: TextStyle(
-            color: Color(0xFFF8FAFC),
+          scrolledUnderElevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: const Color(0xFFF8FAFC),
+          titleTextStyle: GoogleFonts.spaceGrotesk(
+            color: const Color(0xFFF8FAFC),
             fontSize: 20,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.2,

@@ -1,3 +1,4 @@
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import '../widgets/glass_components.dart';
 import '../widgets/resistor_3d_viewer.dart';
@@ -249,44 +250,41 @@ class TypesScreen extends StatelessWidget {
   /// Banner at the top of the screen in visionOS frosted glass styling.
   Widget _buildHeaderBanner(BuildContext context) {
     return GlassContainer(
-      borderRadius: 20,
+      borderRadius: 24,
       glowColor: const Color(0xFF00E5FF),
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(22.0),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.40),
-              ),
-            ),
-            child: const Icon(
-              Icons.view_in_ar_rounded,
-              color: Color(0xFF00E5FF),
-              size: 28,
-            ),
+          const LiquidGlassIconLens(
+            icon: Icons.view_in_ar_rounded,
+            accentColor: Color(0xFF00E5FF),
+            size: 54,
+            iconSize: 28,
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const GlassBadge(
+                  label: 'INTERACTIVE 3D CAD TAXONOMY',
+                  accentColor: Color(0xFF00E5FF),
+                  fontSize: 10,
+                ),
+                const SizedBox(height: 6),
                 Text(
                   '3D Resistor Taxonomy & Models',
-                  style: TextStyle(
-                    fontSize: 17,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFF8FAFC),
-                    letterSpacing: -0.2,
+                    color: const Color(0xFFF8FAFC),
+                    letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Rotate and inspect 3D CAD structural models of fixed, variable, and special resistors.',
-                  style: TextStyle(
+                  'Drag any model in 360° to inspect internal materials, resistive elements, and contacts.',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF94A3B8),
                     height: 1.35,
@@ -405,36 +403,30 @@ class TypesScreen extends StatelessWidget {
     required String application,
   }) {
     return GlassContainer(
-      borderRadius: 18,
-      padding: const EdgeInsets.all(18.0),
-      glowColor: accentColor.withValues(alpha: 0.15),
+      borderRadius: 22,
+      padding: const EdgeInsets.all(20.0),
+      glowColor: accentColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row: Icon + Name
+          // Header Row: Liquid Glass Icon Lens + Name
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: accentColor.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Icon(icon, color: accentColor, size: 22),
+              LiquidGlassIconLens(
+                icon: icon,
+                accentColor: accentColor,
+                size: 46,
+                iconSize: 22,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   name,
-                  style: const TextStyle(
-                    fontSize: 15.5,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFF8FAFC),
+                    color: const Color(0xFFF8FAFC),
                     height: 1.25,
                   ),
                 ),
@@ -446,10 +438,10 @@ class TypesScreen extends StatelessWidget {
           // Interactive 3D Model Viewport
           Resistor3DViewer(
             type: modelType,
-            height: 150,
+            height: 155,
             title: name,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           // 1. What it does
           _buildDetailRow(
@@ -457,7 +449,7 @@ class TypesScreen extends StatelessWidget {
             tagColor: const Color(0xFF00E5FF),
             content: whatItDoes,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // 2. How it works
           _buildDetailRow(
@@ -465,7 +457,7 @@ class TypesScreen extends StatelessWidget {
             tagColor: const Color(0xFF2DD4BF),
             content: howItWorks,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // 3. Common Application
           _buildDetailRow(
@@ -483,36 +475,35 @@ class TypesScreen extends StatelessWidget {
     required Color tagColor,
     required String content,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: tagColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: tagColor.withValues(alpha: 0.30)),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF070F1C).withValues(alpha: 0.60),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: tagColor.withValues(alpha: 0.20),
+          width: 0.9,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GlassBadge(
+            label: tag,
+            accentColor: tagColor,
+            fontSize: 9.5,
           ),
-          child: Text(
-            tag,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.bold,
-              color: tagColor,
-              letterSpacing: 0.3,
+          const SizedBox(height: 6),
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: Color(0xFFCBD5E1),
+              height: 1.4,
             ),
           ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          content,
-          style: const TextStyle(
-            fontSize: 12.5,
-            color: Color(0xFFCBD5E1),
-            height: 1.4,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

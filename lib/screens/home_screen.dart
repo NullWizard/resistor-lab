@@ -237,62 +237,113 @@ class HomeScreen extends StatelessWidget {
 }
 
   /// Polished Header with "Basic Electronics Lab", "Resistor", and Subtitle.
+  /// Polished Header with "Basic Electronics Lab", "Resistor", and Subtitle.
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
 
     return GlassContainer(
-      borderRadius: 22,
+      borderRadius: 26,
       glowColor: const Color(0xFF00E5FF),
-      padding: const EdgeInsets.all(22.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Department / Lab Tag
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+          Row(
+            children: [
+              const GlassBadge(
+                label: 'BASIC ELECTRONICS LAB',
+                icon: Icons.school_rounded,
+                accentColor: Color(0xFF00E5FF),
+                fontSize: 11,
               ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.school_rounded, color: Color(0xFFF59E0B), size: 14),
-                SizedBox(width: 6),
-                Text(
-                  'Basic Electronics Lab',
-                  style: TextStyle(
-                    color: Color(0xFFE2E8F0),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.40),
+                    width: 1,
                   ),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF10B981),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0xFF10B981),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Main Title with Circuit Bolt
+          Row(
+            children: [
+              const LiquidGlassIconLens(
+                icon: Icons.electric_bolt_rounded,
+                accentColor: Color(0xFF00E5FF),
+                size: 46,
+                iconSize: 24,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Resistor',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Virtual Laboratory & 3D Interactive Workbench',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
 
-          // Main Title
-          Text(
-            'Resistor',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-
           // Subtitle
           Text(
-            'Interactive 3D models, color calculators, and comprehensive lab theory.',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF94A3B8),
-              height: 1.4,
+            'Interactive 3D models, color calculators, viva flashcards, and comprehensive lab theory.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFFCBD5E1),
+              height: 1.45,
               fontWeight: FontWeight.w400,
             ),
           ),
@@ -313,30 +364,21 @@ class HomeScreen extends StatelessWidget {
     ];
 
     return GlassContainer(
-      borderRadius: 18,
-      glowColor: const Color(0xFF10B981).withValues(alpha: 0.15),
-      padding: const EdgeInsets.all(18.0),
+      borderRadius: 24,
+      glowColor: const Color(0xFF10B981),
+      padding: const EdgeInsets.all(20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.35),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.assignment_outlined,
-                  color: Color(0xFF10B981),
-                  size: 16,
-                ),
+              const LiquidGlassIconLens(
+                icon: Icons.assignment_outlined,
+                accentColor: Color(0xFF10B981),
+                size: 38,
+                iconSize: 19,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Text(
                 'Lab Objectives',
                 style: theme.textTheme.titleSmall?.copyWith(
@@ -345,36 +387,62 @@ class HomeScreen extends StatelessWidget {
                   letterSpacing: 0.2,
                 ),
               ),
+              const Spacer(),
+              const GlassBadge(
+                label: '4 GOALS',
+                accentColor: Color(0xFF10B981),
+                fontSize: 10,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ...objectives.map(
             (obj) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2.0),
-                    child: Icon(
-                      Icons.check_circle_rounded,
-                      color: Color(0xFF10B981),
-                      size: 16,
-                    ),
+              padding: const EdgeInsets.symmetric(vertical: 4.5),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF08121E).withValues(alpha: 0.60),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                    width: 0.9,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      obj,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        color: Color(0xFFCBD5E1),
-                        fontWeight: FontWeight.w500,
-                        height: 1.35,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF10B981).withValues(alpha: 0.20),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.50),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Color(0xFF10B981),
+                        size: 12,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        obj,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          color: Color(0xFFE2E8F0),
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -398,59 +466,31 @@ class HomeScreen extends StatelessWidget {
 
     return GlassContainer(
       onTap: onTap,
-      borderRadius: 18,
-      glowColor: accentColor.withValues(alpha: 0.2),
+      borderRadius: 22,
+      glowColor: accentColor,
       padding: const EdgeInsets.all(18.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Module Icon Container
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: accentColor.withValues(alpha: 0.35),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: accentColor,
-              size: 26,
-            ),
+          // Floating Liquid Glass Icon Lens
+          LiquidGlassIconLens(
+            icon: icon,
+            accentColor: accentColor,
+            size: 52,
+            iconSize: 26,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
 
           // Content Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Module Tag
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.30),
-                    ),
-                  ),
-                  child: Text(
-                    moduleNumber,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: accentColor,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
+                // Module Capsule Tag
+                GlassBadge(
+                  label: moduleNumber,
+                  accentColor: accentColor,
+                  fontSize: 10.0,
                 ),
                 const SizedBox(height: 6),
 
@@ -477,15 +517,24 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
 
-          // Forward Chevron Arrow
-          Padding(
-            padding: const EdgeInsets.only(top: 14.0),
+          // Forward Glass Button Lens
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accentColor.withValues(alpha: 0.12),
+              border: Border.all(
+                color: accentColor.withValues(alpha: 0.35),
+                width: 1,
+              ),
+            ),
             child: Icon(
               Icons.arrow_forward_ios_rounded,
-              color: accentColor.withValues(alpha: 0.6),
-              size: 16,
+              color: accentColor,
+              size: 13,
             ),
           ),
         ],
