@@ -105,7 +105,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -125,7 +124,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                 16.0,
-                MediaQuery.paddingOf(context).top + kToolbarHeight + 8.0,
+                14.0,
                 16.0,
                 MediaQuery.paddingOf(context).bottom + 40.0,
               ),
