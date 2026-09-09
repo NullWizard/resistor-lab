@@ -113,7 +113,7 @@ class _StaticAmbientBackgroundPainter extends CustomPainter {
     final maxRadius = math.max(size.width, size.height) * 0.75;
 
     // 2. Luminous Ambient Chromatic Aura
-    if (kIsWeb) {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
       final ambientAuraPaint = Paint()
         ..shader = RadialGradient(
           colors: [
@@ -195,7 +195,7 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
     ];
 
     const numRadiatingRings = 6;
-    final steps = kIsWeb ? 60 : 96;
+    final steps = (kIsWeb || defaultTargetPlatform == TargetPlatform.android) ? 60 : 96;
 
     for (int k = 0; k < numRadiatingRings; k++) {
       final ringProgress = (progress + k / numRadiatingRings) % 1.0;
@@ -228,7 +228,7 @@ class _SiriRadiatingWavesPainter extends CustomPainter {
       }
       path.close();
 
-      if (kIsWeb) {
+      if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
         // High-performance hardware-accelerated dual-pass glow for WebGL / CanvasKit.
         // 1. Soft glowing neon halo
         final haloPaint = Paint()
@@ -369,7 +369,7 @@ class _GlassContainerState extends State<GlassContainer> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(widget.borderRadius),
-          child: kIsWeb
+          child: (kIsWeb || defaultTargetPlatform == TargetPlatform.android)
               ? CustomPaint(
                   foregroundPainter: _RealLiquidGlassBorderPainter(
                     borderRadius: widget.borderRadius,
