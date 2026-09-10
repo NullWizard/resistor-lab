@@ -69,6 +69,123 @@ class Vector3 {
   }
 }
 
+/// A 3x3 transformation matrix for view-relative trackball rotations without gimbal lock or axis mirroring.
+class Matrix3 {
+  final double m00, m01, m02;
+  final double m10, m11, m12;
+  final double m20, m21, m22;
+
+  const Matrix3(
+    this.m00, this.m01, this.m02,
+    this.m10, this.m11, this.m12,
+    this.m20, this.m21, this.m22,
+  );
+
+  static const Matrix3 identity = Matrix3(
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1,
+  );
+
+  factory Matrix3.rotationX(double angle) {
+    final c = math.cos(angle);
+    final s = math.sin(angle);
+    return Matrix3(
+      1, 0, 0,
+      0, c, -s,
+      0, s, c,
+    );
+  }
+
+  factory Matrix3.rotationY(double angle) {
+    final c = math.cos(angle);
+    final s = math.sin(angle);
+    return Matrix3(
+      c, 0, s,
+      0, 1, 0,
+      -s, 0, c,
+    );
+  }
+
+  factory Matrix3.rotationZ(double angle) {
+    final c = math.cos(angle);
+    final s = math.sin(angle);
+    return Matrix3(
+      c, -s, 0,
+      s, c, 0,
+      0, 0, 1,
+    );
+  }
+
+  static Matrix3 initial() {
+    return Matrix3.rotationY(0.52).multiply(Matrix3.rotationX(-0.26));
+  }
+
+  Matrix3 multiply(Matrix3 o) {
+    return Matrix3(
+      m00 * o.m00 + m01 * o.m10 + m02 * o.m20,
+      m00 * o.m01 + m01 * o.m11 + m02 * o.m21,
+      m00 * o.m02 + m01 * o.m12 + m02 * o.m22,
+
+      m10 * o.m00 + m11 * o.m10 + m12 * o.m20,
+      m10 * o.m01 + m11 * o.m11 + m12 * o.m21,
+      m10 * o.m02 + m11 * o.m12 + m12 * o.m22,
+
+      m20 * o.m00 + m21 * o.m10 + m22 * o.m20,
+      m20 * o.m01 + m21 * o.m11 + m22 * o.m21,
+      m20 * o.m02 + m21 * o.m12 + m22 * o.m22,
+    );
+  }
+
+  Vector3 transform(Vector3 v) {
+    return Vector3(
+      m00 * v.x + m01 * v.y + m02 * v.z,
+      m10 * v.x + m11 * v.y + m12 * v.z,
+      m20 * v.x + m21 * v.y + m22 * v.z,
+    );
+  }
+
+  Matrix3 orthonormalized() {
+    final r0 = Vector3(m00, m01, m02).normalized;
+    final r1Raw = Vector3(m10, m11, m12);
+    final dot = r1Raw.dot(r0);
+    final r1 = Vector3(
+      r1Raw.x - dot * r0.x,
+      r1Raw.y - dot * r0.y,
+      r1Raw.z - dot * r0.z,
+    ).normalized;
+    final r2 = r0.cross(r1);
+
+    return Matrix3(
+      r0.x, r0.y, r0.z,
+      r1.x, r1.y, r1.z,
+      r2.x, r2.y, r2.z,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! Matrix3) return false;
+    return (m00 - other.m00).abs() < 1e-6 &&
+        (m01 - other.m01).abs() < 1e-6 &&
+        (m02 - other.m02).abs() < 1e-6 &&
+        (m10 - other.m10).abs() < 1e-6 &&
+        (m11 - other.m11).abs() < 1e-6 &&
+        (m12 - other.m12).abs() < 1e-6 &&
+        (m20 - other.m20).abs() < 1e-6 &&
+        (m21 - other.m21).abs() < 1e-6 &&
+        (m22 - other.m22).abs() < 1e-6;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        m00, m01, m02,
+        m10, m11, m12,
+        m20, m21, m22,
+      );
+}
+
 /// A 3D triangular face for realistic, watertight solid rendering.
 class Face3D {
   final List<Vector3> vertices;
@@ -134,8 +251,7 @@ class Resistor3DViewer extends StatefulWidget {
 }
 
 class _Resistor3DViewerState extends State<Resistor3DViewer> {
-  double _yaw = 0.52;
-  double _pitch = -0.26;
+  Matrix3 _rotation = Matrix3.initial();
 
   void _openInspectionDialog(BuildContext context) {
     showDialog(
@@ -198,24 +314,22 @@ class _Resistor3DViewerState extends State<Resistor3DViewer> {
               child: GestureDetector(
                 onPanUpdate: (details) {
                   if (widget.enableGesture) {
+                    final deltaRot = Matrix3.rotationX(details.delta.dy * 0.015)
+                        .multiply(Matrix3.rotationY(-details.delta.dx * 0.015));
                     setState(() {
-                      _yaw += details.delta.dx * 0.018;
-                      _pitch = (_pitch - details.delta.dy * 0.018)
-                          .clamp(-math.pi / 2.2, math.pi / 2.2);
+                      _rotation = deltaRot.multiply(_rotation).orthonormalized();
                     });
                   }
                 },
                 onDoubleTap: () {
                   setState(() {
-                    _yaw = 0.52;
-                    _pitch = -0.26;
+                    _rotation = Matrix3.initial();
                   });
                 },
                 child: CustomPaint(
                   painter: _Resistor3DPainter(
                     type: widget.type,
-                    yaw: _yaw,
-                    pitch: _pitch,
+                    rotation: _rotation,
                     zoom: 1.12,
                   ),
                 ),
@@ -320,8 +434,7 @@ class _Resistor3DInspectorDialog extends StatefulWidget {
 class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
     with SingleTickerProviderStateMixin {
   late AnimationController _rotationAnim;
-  double _yaw = 0.52;
-  double _pitch = -0.26;
+  Matrix3 _rotation = Matrix3.initial();
   double _zoom = 1.50;
   bool _autoRotate = true;
 
@@ -333,9 +446,9 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
       duration: const Duration(seconds: 14),
     )..addListener(() {
         if (_autoRotate) {
+          final autoDelta = Matrix3.rotationY(-0.009);
           setState(() {
-            _yaw += 0.009;
-            if (_yaw > math.pi * 2) _yaw -= math.pi * 2;
+            _rotation = autoDelta.multiply(_rotation).orthonormalized();
           });
         }
       });
@@ -424,17 +537,16 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
                         child: GestureDetector(
                           onPanStart: (_) => setState(() => _autoRotate = false),
                           onPanUpdate: (details) {
+                            final deltaRot = Matrix3.rotationX(details.delta.dy * 0.015)
+                                .multiply(Matrix3.rotationY(-details.delta.dx * 0.015));
                             setState(() {
-                              _yaw += details.delta.dx * 0.015;
-                              _pitch = (_pitch - details.delta.dy * 0.015)
-                                  .clamp(-math.pi / 2.2, math.pi / 2.2);
+                              _rotation = deltaRot.multiply(_rotation).orthonormalized();
                             });
                           },
                           child: CustomPaint(
                             painter: _Resistor3DPainter(
                               type: widget.type,
-                              yaw: _yaw,
-                              pitch: _pitch,
+                              rotation: _rotation,
                               zoom: _zoom,
                             ),
                           ),
@@ -452,7 +564,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
                             border: Border.all(color: const Color(0xFF334155)),
                           ),
                           child: Text(
-                            'YAW: ${(_yaw * 180 / math.pi % 360).round()}° | PITCH: ${(_pitch * 180 / math.pi).round()}°',
+                            'ROTATION: 360° VIEW-RELATIVE',
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 10,
                               color: const Color(0xFF00E5FF),
@@ -540,8 +652,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
                   OutlinedButton.icon(
                     onPressed: () {
                       setState(() {
-                        _yaw = 0.52;
-                        _pitch = -0.26;
+                        _rotation = Matrix3.initial();
                         _zoom = 1.50;
                         _autoRotate = true;
                       });
@@ -594,8 +705,7 @@ class _Resistor3DInspectorDialogState extends State<_Resistor3DInspectorDialog>
 /// Canvas painter for 100% solid, full-bodied 3D components.
 class _Resistor3DPainter extends CustomPainter {
   final Resistor3DType type;
-  final double yaw;
-  final double pitch;
+  final Matrix3 rotation;
   final double zoom;
 
   static const double focalLength = 380.0;
@@ -603,8 +713,7 @@ class _Resistor3DPainter extends CustomPainter {
 
   _Resistor3DPainter({
     required this.type,
-    required this.yaw,
-    required this.pitch,
+    required this.rotation,
     required this.zoom,
   });
 
@@ -622,7 +731,7 @@ class _Resistor3DPainter extends CustomPainter {
     final transformedFaces = <Face3D>[];
     for (final face in rawFaces) {
       final tVerts = face.vertices.map((v) {
-        return v.rotateX(pitch).rotateY(yaw) * zoom;
+        return rotation.transform(v) * zoom;
       }).toList();
 
       transformedFaces.add(Face3D(
@@ -636,8 +745,8 @@ class _Resistor3DPainter extends CustomPainter {
 
     final transformedLines = <Line3D>[];
     for (final line in rawLines) {
-      final tStart = line.start.rotateX(pitch).rotateY(yaw) * zoom;
-      final tEnd = line.end.rotateX(pitch).rotateY(yaw) * zoom;
+      final tStart = rotation.transform(line.start) * zoom;
+      final tEnd = rotation.transform(line.end) * zoom;
       transformedLines.add(Line3D(
         start: tStart,
         end: tEnd,
@@ -1722,8 +1831,7 @@ class _Resistor3DPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _Resistor3DPainter oldDelegate) =>
-      oldDelegate.yaw != yaw ||
-      oldDelegate.pitch != pitch ||
+      oldDelegate.rotation != rotation ||
       oldDelegate.zoom != zoom ||
       oldDelegate.type != type;
 }
