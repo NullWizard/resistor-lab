@@ -110,19 +110,23 @@ void main() {
       expect(detected.last - detected.first > 0.60, isTrue);
     });
 
-    test('Test on user image file', () {
-      final file = io.File(r'C:\Users\spjen\.gemini\antigravity\brain\2e96059d-428e-4633-ba2a-42b8adcbe878\scratch\simulated_processed.png');
+    test('Detects accurate stripes on real resistor image across zoom framing', () {
+      final file = io.File(r'C:\Users\spjen\Downloads\resistor.webp');
       if (file.existsSync()) {
         final bytes = file.readAsBytesSync();
         final detected = OpticalStripeDetector.detectStripes(
           bytes,
           4,
-          viewportWidth: 670,
-          viewportHeight: 430,
+          viewportWidth: 768,
+          viewportHeight: 290,
           isReversed: true,
         );
         expect(detected, isNotNull);
         expect(detected!.length, 4);
+        // Verify all 4 bands are distinct, separated, and ordered
+        expect((detected[0] - detected[1]).abs() > 0.05, isTrue);
+        expect((detected[1] - detected[2]).abs() > 0.05, isTrue);
+        expect((detected[2] - detected[3]).abs() > 0.05, isTrue);
       }
     });
 

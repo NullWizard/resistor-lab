@@ -306,7 +306,7 @@ class OpticalStripeDetector {
       final int gHeight = gBottom - gTop;
       if (gWidth < 40 || gHeight < 10) return null;
 
-      // Anti-glare central cylinder row filtering (median across rows in ±yRadius)
+      // 1. Column colors via median along central cylinder axis (rejects ridge glare)
       final int yCenter = (gTop + gBottom) ~/ 2;
       final int yRadius = math.max(2, (gHeight * 0.18).round());
 
@@ -329,138 +329,93 @@ class OpticalStripeDetector {
         colColors.add([rList[mid], gList[mid], bList[mid]]);
       }
 
-      // Estimate ceramic body background color: median across central 60%
-      final int cStart = (gWidth * 0.20).round();
-      final int cEnd = (gWidth * 0.80).round();
-      final List<double> bodyRs = [];
-      final List<double> bodyGs = [];
-      final List<double> bodyBs = [];
-      for (int i = cStart; i < cEnd && i < colColors.length; i++) {
-        bodyRs.add(colColors[i][0]);
-        bodyGs.add(colColors[i][1]);
-        bodyBs.add(colColors[i][2]);
+      // 2. Robust Ceramic Body Color Estimation:
+      // Sort columns by luminance. The ceramic body corresponds to the 70th percentile
+      // (avoids dark bands while avoiding extreme specular white highlights).
+      final List<double> lums = [];
+      for (final c in colColors) {
+        lums.add(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]);
       }
-      bodyRs.sort(); bodyGs.sort(); bodyBs.sort();
-      final double bodyR = bodyRs.isNotEmpty ? bodyRs[bodyRs.length ~/ 2] : 220.0;
-      final double bodyG = bodyGs.isNotEmpty ? bodyGs[bodyGs.length ~/ 2] : 200.0;
-      final double bodyB = bodyBs.isNotEmpty ? bodyBs[bodyBs.length ~/ 2] : 170.0;
-      final double bodyLum = 0.299 * bodyR + 0.587 * bodyG + 0.114 * bodyB;
+      final sortedIndicesByLum = List.generate(colColors.length, (i) => i)
+        ..sort((a, b) => lums[a].compareTo(lums[b]));
+      final int p70 = sortedIndicesByLum[(colColors.length * 0.70).round().clamp(0, colColors.length - 1)];
+      final double bodyR = colColors[p70][0];
+      final double bodyG = colColors[p70][1];
+      final double bodyB = colColors[p70][2];
+      final double bodyLum = lums[p70];
 
-      // Ceramic body boundaries
-      bool isBodyCol(List<double> c) {
-        final double r = c[0], g = c[1], b = c[2];
-        final double maxC = math.max(r, math.max(g, b));
-        final double minC = math.min(r, math.min(g, b));
-        final double chroma = maxC - minC;
-        final double lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        if (chroma > 12 && (r > b + 6 || g > b + 12 || b > r + 12)) return true;
-        if (lum < 115 && chroma > 5) return true;
-        if (r > 140 && g > 115 && b < 125) return true; // Gold
-        return false;
-      }
-
-      int bodyMinIdx = 0;
-      int bodyMaxIdx = colColors.length - 1;
-
-      for (int i = 0; i < colColors.length - 3; i++) {
-        if (isBodyCol(colColors[i]) && isBodyCol(colColors[i + 1]) && isBodyCol(colColors[i + 2])) {
-          bodyMinIdx = i;
-          break;
-        }
-      }
-
-      for (int i = colColors.length - 1; i >= 3; i--) {
-        if (isBodyCol(colColors[i]) && isBodyCol(colColors[i - 1]) && isBodyCol(colColors[i - 2])) {
-          bodyMaxIdx = i;
-          break;
-        }
-      }
-
-      if (bodyMaxIdx <= bodyMinIdx + 20) {
-        bodyMinIdx = (gWidth * 0.16).round();
-        bodyMaxIdx = (gWidth * 0.84).round();
-      }
-
-      final int bodySpan = math.max(25, bodyMaxIdx - bodyMinIdx);
-      final double bodyMinNorm = (bodyMinIdx / gWidth).clamp(0.04, 0.35);
-      final double bodyMaxNorm = (bodyMaxIdx / gWidth).clamp(0.65, 0.96);
-      final double bodySpanNorm = math.max(0.30, bodyMaxNorm - bodyMinNorm);
-
-      final int step = math.max(2, (gWidth * 0.018).round()).clamp(2, 6);
-      final double minSeparation = math.max(gWidth * 0.045, gWidth / (bandCount * 3.6));
-
-      // Multi-feature stripe contrast score
+      // 3. Contrast Signal: Distance from ceramic body in color and luminance
       final List<double> rawScores = List.filled(colColors.length, 0.0);
-      for (int i = step; i < colColors.length - step; i++) {
-        final cur = colColors[i];
-        final prev = colColors[i - step];
-        final next = colColors[i + step];
-
-        final double edge = ((cur[0] - prev[0]).abs() + (next[0] - cur[0]).abs() +
-                             (cur[1] - prev[1]).abs() + (next[1] - cur[1]).abs() +
-                             (cur[2] - prev[2]).abs() + (next[2] - cur[2]).abs()) / 6.0;
-
+      for (int i = 0; i < colColors.length; i++) {
+        final c = colColors[i];
         final double dE = math.sqrt(
-          math.pow(cur[0] - bodyR, 2) +
-          math.pow(cur[1] - bodyG, 2) +
-          math.pow(cur[2] - bodyB, 2),
+          math.pow(c[0] - bodyR, 2) +
+          math.pow(c[1] - bodyG, 2) +
+          math.pow(c[2] - bodyB, 2),
         );
-
-        final double maxC = math.max(cur[0], math.max(cur[1], cur[2]));
-        final double minC = math.min(cur[0], math.min(cur[1], cur[2]));
-        final double sat = maxC - minC;
-
-        final double curLum = 0.299 * cur[0] + 0.587 * cur[1] + 0.114 * cur[2];
-        final double dLum = (curLum - bodyLum).abs();
-
-        rawScores[i] = dE * 1.0 + sat * 1.2 + dLum * 0.8 + edge * 0.6;
+        final double dLum = math.max(0.0, bodyLum - lums[i]);
+        rawScores[i] = dE * 0.75 + dLum * 0.85;
       }
 
-      // Adaptive smoothing filter to remove sensor grain
-      final List<double> scores = List.filled(rawScores.length, 0.0);
-      for (int i = 1; i < rawScores.length - 1; i++) {
-        scores[i] = (rawScores[i - 1] + rawScores[i] * 2.0 + rawScores[i + 1]) / 4.0;
+      // 4. Proportional Moving Average Filter (window scales with guide width)
+      final int win = math.max(3, (gWidth * 0.012).round());
+      final List<double> smooth = List.from(rawScores);
+      for (int i = win; i < rawScores.length - win; i++) {
+        double sum = 0.0;
+        for (int k = i - win; k <= i + win; k++) {
+          sum += rawScores[k];
+        }
+        smooth[i] = sum / (2 * win + 1);
       }
 
-      final double maxScore = scores.isNotEmpty ? scores.reduce(math.max) : 0.0;
-      final double threshold = math.max(12.0, maxScore * 0.18);
+      // 5. True Local Maxima Peak Detection:
+      // A peak must be strictly greater than all neighbors within ±peakWindow
+      final int peakWindow = math.max(8, (gWidth * 0.035).round());
+      const double minScoreThreshold = 35.0;
 
-      final int searchMin = math.max(step, (bodyMinIdx + bodySpan * 0.02).round());
-      final int searchMax = math.min(gWidth - step - 1, (bodyMaxIdx - bodySpan * 0.02).round());
-
-      final List<int> candidateIndices = [];
-      for (int i = searchMin; i <= searchMax; i++) {
-        candidateIndices.add(i);
+      final List<int> candidatePeaks = [];
+      for (int i = peakWindow; i < smooth.length - peakWindow; i++) {
+        if (smooth[i] < minScoreThreshold) continue;
+        bool isMax = true;
+        for (int k = i - peakWindow; k < i; k++) {
+          if (smooth[i] <= smooth[k]) { isMax = false; break; }
+        }
+        if (!isMax) continue;
+        for (int k = i + 1; k <= i + peakWindow; k++) {
+          if (smooth[i] < smooth[k]) { isMax = false; break; }
+        }
+        if (isMax) {
+          candidatePeaks.add(i);
+        }
       }
-      candidateIndices.sort((a, b) => scores[b].compareTo(scores[a]));
 
-      final List<int> peaks = [];
-      for (final idx in candidateIndices) {
-        if (scores[idx] < threshold) break;
-        bool tooClose = false;
-        for (final p in peaks) {
-          if ((p - idx).abs() < minSeparation) {
-            tooClose = true;
-            break;
+      // If fewer than bandCount peaks found with minScoreThreshold, lower threshold
+      if (candidatePeaks.length < bandCount) {
+        final double lowerThresh = math.max(18.0, minScoreThreshold * 0.5);
+        for (int i = peakWindow; i < smooth.length - peakWindow; i++) {
+          if (smooth[i] >= lowerThresh && smooth[i] < minScoreThreshold) {
+            bool isMax = true;
+            for (int k = i - peakWindow; k <= i + peakWindow; k++) {
+              if (k != i && smooth[i] < smooth[k]) { isMax = false; break; }
+            }
+            if (isMax && !candidatePeaks.contains(i)) {
+              candidatePeaks.add(i);
+            }
           }
         }
-        if (!tooClose) {
-          peaks.add(idx);
-          if (peaks.length >= bandCount + 5) break;
-        }
+        candidatePeaks.sort();
       }
-      peaks.sort();
 
-      // Sub-pixel weighted centroid refinement
+      // 6. Sub-Pixel Centroid Refinement
       final Map<int, double> refinedCentroids = {};
-      for (final p in peaks) {
-        final int rad = math.max(3, (step * 2).clamp(3, 10));
-        final double baseFloor = scores[p] * 0.35;
+      for (final p in candidatePeaks) {
+        final int rad = math.max(3, (peakWindow ~/ 2));
+        final double baseFloor = smooth[p] * 0.35;
         double sumW = 0.0;
         double sumWX = 0.0;
         for (int k = p - rad; k <= p + rad; k++) {
-          if (k >= 0 && k < scores.length) {
-            final double weight = math.max(0.0, scores[k] - baseFloor);
+          if (k >= 0 && k < smooth.length) {
+            final double weight = math.max(0.0, smooth[k] - baseFloor);
             sumW += weight;
             sumWX += k * weight;
           }
@@ -468,55 +423,68 @@ class OpticalStripeDetector {
         refinedCentroids[p] = sumW > 0.001 ? (sumWX / sumW) : p.toDouble();
       }
 
+      // 7. Optimal Subset Selection via Gap-Consistency & Score Fitness
       List<int>? chosenPeaks;
-      if (peaks.length >= bandCount) {
-        if (peaks.length == bandCount) {
-          chosenPeaks = peaks;
-        } else {
-          double bestFitness = -1.0;
-          List<int> bestSubset = peaks.sublist(0, bandCount);
+      if (candidatePeaks.length == bandCount) {
+        chosenPeaks = candidatePeaks;
+      } else if (candidatePeaks.length > bandCount) {
+        double bestFitness = -1e9;
+        List<int>? bestSubset;
 
-          void findBest(List<int> current, int start) {
-            if (current.length == bandCount) {
-              final double span = (current.last - current.first).toDouble();
-              if (span < bodySpan * 0.30 && peaks.length > bandCount) return;
-              final double avgScore =
-                  current.map((p) => scores[p]).reduce((a, b) => a + b) / bandCount;
-              final double fitness = avgScore * (1.0 + (span / bodySpan) * 0.7);
-              if (fitness > bestFitness) {
-                bestFitness = fitness;
-                bestSubset = List.from(current);
-              }
-              return;
+        void findSubset(List<int> current, int start) {
+          if (current.length == bandCount) {
+            final List<double> normPos = current.map((p) => (refinedCentroids[p] ?? p.toDouble()) / gWidth).toList();
+            final double span = normPos.last - normPos.first;
+            if (span < 0.18 || span > 0.92) return;
+
+            final List<double> gaps = [];
+            for (int i = 0; i < bandCount - 1; i++) {
+              gaps.add(normPos[i + 1] - normPos[i]);
             }
-            for (int i = start; i < peaks.length; i++) {
-              current.add(peaks[i]);
-              findBest(current, i + 1);
-              current.removeLast();
+            final double minGap = gaps.reduce(math.min);
+            final double maxGap = gaps.reduce(math.max);
+            if (minGap < 0.035) return; // Bands cannot collide
+
+            final double gapRatio = maxGap / minGap;
+            final double avgScore = current.map((p) => smooth[p]).reduce((a, b) => a + b) / bandCount;
+            final double fitness = avgScore - (gapRatio - 1.0) * 45.0;
+
+            if (fitness > bestFitness) {
+              bestFitness = fitness;
+              bestSubset = List.from(current);
             }
+            return;
           }
-
-          findBest([], 0);
-          chosenPeaks = bestSubset;
+          for (int i = start; i < candidatePeaks.length; i++) {
+            current.add(candidatePeaks[i]);
+            findSubset(current, i + 1);
+            current.removeLast();
+          }
         }
-      } else if (peaks.length == bandCount - 1 && peaks.isNotEmpty) {
-        final double avgGap = (peaks.last - peaks.first) / (peaks.length - 1);
-        final int estLast = (peaks.last + avgGap * 1.1).round().clamp(searchMin, searchMax);
-        peaks.add(estLast);
-        refinedCentroids[estLast] = estLast.toDouble();
-        peaks.sort();
-        chosenPeaks = peaks;
+
+        findSubset([], 0);
+        chosenPeaks = bestSubset ?? candidatePeaks.sublist(0, bandCount);
+      } else if (candidatePeaks.length == bandCount - 1 && candidatePeaks.isNotEmpty) {
+        // Interpolate single missing band based on average spacing
+        final double avgGap = (candidatePeaks.last - candidatePeaks.first) / (candidatePeaks.length - 1);
+        final int est = (candidatePeaks.last + avgGap).round().clamp(10, gWidth - 10);
+        candidatePeaks.add(est);
+        refinedCentroids[est] = est.toDouble();
+        candidatePeaks.sort();
+        chosenPeaks = candidatePeaks;
       }
 
-      // If peaks found, map refined sub-pixel centroids to normalized 0..1 coordinates
+      // 8. Orientation Check & Normalized Coordinates Mapping
       if (chosenPeaks != null && chosenPeaks.length == bandCount) {
         bool finalReversed = isReversed;
-        final leftP = chosenPeaks.first;
-        final rightP = chosenPeaks.last;
+        final int leftP = chosenPeaks.first;
+        final int rightP = chosenPeaks.last;
         final leftC = colColors[leftP];
         final rightC = colColors[rightP];
-        final bool leftIsGold = leftC[0] > 135 && leftC[1] > 105 && leftC[2] < 135 && (leftC[0] - leftC[2]) > 20;
-        final bool rightIsGold = rightC[0] > 135 && rightC[1] > 105 && rightC[2] < 135 && (rightC[0] - rightC[2]) > 20;
+        // Gold: amber sheen (R > 140, G > 105, B < 130, R - B > 20)
+        final bool leftIsGold = leftC[0] > 140 && leftC[1] > 105 && leftC[2] < 130 && (leftC[0] - leftC[2]) > 20;
+        final bool rightIsGold = rightC[0] > 140 && rightC[1] > 105 && rightC[2] < 130 && (rightC[0] - rightC[2]) > 20;
+
         if (leftIsGold && !rightIsGold) {
           finalReversed = true;
         } else if (rightIsGold && !leftIsGold) {
@@ -530,28 +498,22 @@ class OpticalStripeDetector {
         }).toList();
       }
 
-      // -------------------------------------------------------------
-      // 4. ZOOM-ADAPTIVE DYNAMIC FALLBACK
-      // -------------------------------------------------------------
+      // Fallback: Proportional axial anchors
       final List<double> relFractions;
       if (bandCount == 4) {
         relFractions = isReversed
-            ? [0.88, 0.62, 0.38, 0.14]
-            : [0.14, 0.38, 0.62, 0.88];
+            ? [0.74, 0.56, 0.40, 0.26]
+            : [0.26, 0.40, 0.56, 0.74];
       } else if (bandCount == 5) {
         relFractions = isReversed
-            ? [0.90, 0.72, 0.54, 0.36, 0.12]
-            : [0.12, 0.36, 0.54, 0.72, 0.90];
+            ? [0.76, 0.62, 0.50, 0.38, 0.24]
+            : [0.24, 0.38, 0.50, 0.62, 0.76];
       } else {
         relFractions = isReversed
-            ? [0.90, 0.75, 0.60, 0.45, 0.30, 0.12]
-            : [0.12, 0.30, 0.45, 0.60, 0.75, 0.90];
+            ? [0.78, 0.67, 0.56, 0.45, 0.34, 0.22]
+            : [0.22, 0.34, 0.45, 0.56, 0.67, 0.78];
       }
-
-      return relFractions.map((f) {
-        final double normX = bodyMinNorm + bodySpanNorm * f;
-        return normX.clamp(0.06, 0.94);
-      }).toList();
+      return relFractions;
     } catch (_) {}
     return null;
   }
