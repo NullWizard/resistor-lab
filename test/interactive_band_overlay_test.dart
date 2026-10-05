@@ -59,6 +59,56 @@ void main() {
       }
     });
 
+    test('Detects wide stripes on zoomed-in resistor and adapts alignment proportionally', () {
+      // Create a 240x120 synthetic image where the resistor is zoomed in 2x
+      // Guide region is x: 48..192 (width 144), y: 42..78 (height 36)
+      final image = img.Image(width: 240, height: 120);
+      img.fill(image, color: img.ColorRgb8(240, 240, 240));
+
+      // Resistor ceramic body fills the entire guide box horizontally (x: 10..235)
+      for (int y = 42; y < 78; y++) {
+        for (int x = 10; x < 235; x++) {
+          image.setPixelRgb(x, y, 225, 205, 175);
+        }
+      }
+
+      // Draw 4 wide color stripes (Brown, Black, Orange, Gold) with width 8px each (zoomed)
+      // At x = 65, 100, 140, 180 (within guide 48..192)
+      final stripeCenters = [65, 100, 140, 180];
+      final stripeColors = [
+        img.ColorRgb8(100, 50, 20),   // Brown
+        img.ColorRgb8(10, 10, 10),     // Black
+        img.ColorRgb8(255, 120, 0),   // Orange
+        img.ColorRgb8(218, 165, 32),  // Gold
+      ];
+
+      for (int s = 0; s < 4; s++) {
+        final cx = stripeCenters[s];
+        final col = stripeColors[s];
+        for (int dx = -4; dx <= 4; dx++) {
+          for (int y = 42; y < 78; y++) {
+            image.setPixelRgb(cx + dx, y, col.r.toInt(), col.g.toInt(), col.b.toInt());
+          }
+        }
+      }
+
+      final pngBytes = Uint8List.fromList(img.encodePng(image));
+      final detected = OpticalStripeDetector.detectStripes(
+        pngBytes,
+        4,
+        viewportWidth: 240,
+        viewportHeight: 120,
+      );
+
+      expect(detected, isNotNull);
+      expect(detected!.length, 4);
+      expect(detected[0] < detected[1], isTrue);
+      expect(detected[1] < detected[2], isTrue);
+      expect(detected[2] < detected[3], isTrue);
+      // Zoomed stripes span broadly across the guide box (> 0.60 total span)
+      expect(detected.last - detected.first > 0.60, isTrue);
+    });
+
     test('Gracefully returns null on empty or invalid bytes', () {
       expect(OpticalStripeDetector.detectStripes(null, 4), isNull);
       expect(OpticalStripeDetector.detectStripes(Uint8List(0), 4), isNull);
