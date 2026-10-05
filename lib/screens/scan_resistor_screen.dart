@@ -338,25 +338,21 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       final double offsetX = (viewportWidth - fittedW) / 2.0;
       final double offsetY = (viewportHeight - fittedH) / 2.0;
 
-      final double tX = transform.storage[12];
-      final double tY = transform.storage[13];
-      final double scale = transform.getMaxScaleOnAxis();
+      final Matrix4 inv = Matrix4.inverted(transform);
 
-      const int outW = 320;
-      final int outH = (320.0 * (viewportHeight / viewportWidth)).round().clamp(100, 600);
+      final int outW = math.max(640, math.min((viewportWidth * 1.5).round(), 1080));
+      final int outH = (outW * (viewportHeight / viewportWidth)).round().clamp(200, 1080);
       final outImg = img.Image(width: outW, height: outH);
 
       for (int y = 0; y < outH; y++) {
         final double vpY = (y / outH) * viewportHeight;
-        final double childY = (vpY - tY) / scale;
-        final double imgY = (childY - offsetY) / scaleFit;
-        final int srcYInt = imgY.round();
-
         for (int x = 0; x < outW; x++) {
           final double vpX = (x / outW) * viewportWidth;
-          final double childX = (vpX - tX) / scale;
-          final double imgX = (childX - offsetX) / scaleFit;
+          final Offset pt = MatrixUtils.transformPoint(inv, Offset(vpX, vpY));
+          final double imgX = (pt.dx - offsetX) / scaleFit;
+          final double imgY = (pt.dy - offsetY) / scaleFit;
           final int srcXInt = imgX.round();
+          final int srcYInt = imgY.round();
 
           if (srcXInt >= 0 && srcXInt < srcImg.width && srcYInt >= 0 && srcYInt < srcImg.height) {
             outImg.setPixel(x, y, srcImg.getPixel(srcXInt, srcYInt));

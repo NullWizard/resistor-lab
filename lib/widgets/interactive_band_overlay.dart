@@ -306,50 +306,62 @@ class OpticalStripeDetector {
       final int gHeight = gBottom - gTop;
       if (gWidth < 40 || gHeight < 10) return null;
 
-      // Multi-slice horizontal strip across the resistor body (central 50% of guide height)
-      // Exclude cyan reticle crosshair at yCenter (±3 px) so it doesn't contaminate color data
+      // Anti-glare central cylinder row filtering (median across rows in ±yRadius)
       final int yCenter = (gTop + gBottom) ~/ 2;
-      final int yMin = (gTop + gHeight * 0.20).round().clamp(0, h - 1);
-      final int yMax = (gTop + gHeight * 0.80).round().clamp(0, h - 1);
+      final int yRadius = math.max(2, (gHeight * 0.18).round());
 
-      // Compute average column RGB profile across the vertical slice
       final List<List<double>> colColors = [];
       for (int x = gLeft; x < gRight; x++) {
-        double rSum = 0, gSum = 0, bSum = 0;
-        int count = 0;
-        for (int y = yMin; y <= yMax; y++) {
-          if ((y - yCenter).abs() <= 3) continue; // Avoid reticle center line
+        final List<double> rList = [];
+        final List<double> gList = [];
+        final List<double> bList = [];
+        for (int y = yCenter - yRadius; y <= yCenter + yRadius; y++) {
+          if (y < 0 || y >= h) continue;
           final p = decoded.getPixel(x, y);
-          rSum += p.r;
-          gSum += p.g;
-          bSum += p.b;
-          count++;
+          rList.add(p.r.toDouble());
+          gList.add(p.g.toDouble());
+          bList.add(p.b.toDouble());
         }
-        if (count == 0) count = 1;
-        colColors.add([rSum / count, gSum / count, bSum / count]);
+        rList.sort();
+        gList.sort();
+        bList.sort();
+        final int mid = rList.length ~/ 2;
+        colColors.add([rList[mid], gList[mid], bList[mid]]);
       }
 
-      // -------------------------------------------------------------
-      // 1. DYNAMIC CERAMIC BODY BOUNDARY DETECTION (ZOOM ADAPTIVE)
-      // -------------------------------------------------------------
-      // Resistor ceramic body has warm chromaticity (R > B + 10) or dark paint
-      // bands (lum < 115), whereas metallic leads are achromatic (R == G == B).
+      // Estimate ceramic body background color: median across central 60%
+      final int cStart = (gWidth * 0.20).round();
+      final int cEnd = (gWidth * 0.80).round();
+      final List<double> bodyRs = [];
+      final List<double> bodyGs = [];
+      final List<double> bodyBs = [];
+      for (int i = cStart; i < cEnd && i < colColors.length; i++) {
+        bodyRs.add(colColors[i][0]);
+        bodyGs.add(colColors[i][1]);
+        bodyBs.add(colColors[i][2]);
+      }
+      bodyRs.sort(); bodyGs.sort(); bodyBs.sort();
+      final double bodyR = bodyRs.isNotEmpty ? bodyRs[bodyRs.length ~/ 2] : 220.0;
+      final double bodyG = bodyGs.isNotEmpty ? bodyGs[bodyGs.length ~/ 2] : 200.0;
+      final double bodyB = bodyBs.isNotEmpty ? bodyBs[bodyBs.length ~/ 2] : 170.0;
+      final double bodyLum = 0.299 * bodyR + 0.587 * bodyG + 0.114 * bodyB;
+
+      // Ceramic body boundaries
       bool isBodyCol(List<double> c) {
         final double r = c[0], g = c[1], b = c[2];
         final double maxC = math.max(r, math.max(g, b));
         final double minC = math.min(r, math.min(g, b));
         final double chroma = maxC - minC;
         final double lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        if (chroma > 13 && (r > b + 8 || g > b + 14 || b > r + 14)) return true;
+        if (chroma > 12 && (r > b + 6 || g > b + 12 || b > r + 12)) return true;
         if (lum < 115 && chroma > 5) return true;
-        if (r > 155 && g > 135 && b < 130) return true; // Gold/amber band
+        if (r > 140 && g > 115 && b < 125) return true; // Gold
         return false;
       }
 
       int bodyMinIdx = 0;
       int bodyMaxIdx = colColors.length - 1;
 
-      // Find inward start of ceramic body (run of at least 3 body columns)
       for (int i = 0; i < colColors.length - 3; i++) {
         if (isBodyCol(colColors[i]) && isBodyCol(colColors[i + 1]) && isBodyCol(colColors[i + 2])) {
           bodyMinIdx = i;
@@ -357,7 +369,6 @@ class OpticalStripeDetector {
         }
       }
 
-      // Find inward end of ceramic body from right
       for (int i = colColors.length - 1; i >= 3; i--) {
         if (isBodyCol(colColors[i]) && isBodyCol(colColors[i - 1]) && isBodyCol(colColors[i - 2])) {
           bodyMaxIdx = i;
@@ -365,10 +376,9 @@ class OpticalStripeDetector {
         }
       }
 
-      // Ensure body indices are sane
       if (bodyMaxIdx <= bodyMinIdx + 20) {
-        bodyMinIdx = (gWidth * 0.18).round();
-        bodyMaxIdx = (gWidth * 0.82).round();
+        bodyMinIdx = (gWidth * 0.16).round();
+        bodyMaxIdx = (gWidth * 0.84).round();
       }
 
       final int bodySpan = math.max(25, bodyMaxIdx - bodyMinIdx);
@@ -376,47 +386,34 @@ class OpticalStripeDetector {
       final double bodyMaxNorm = (bodyMaxIdx / gWidth).clamp(0.65, 0.96);
       final double bodySpanNorm = math.max(0.30, bodyMaxNorm - bodyMinNorm);
 
-      // -------------------------------------------------------------
-      // 2. ADAPTIVE KERNEL PARAMETERS BASED ON ZOOM / BODY SPAN
-      // -------------------------------------------------------------
-      // Zoomed-in resistors have wider stripes (20-40px) and larger body spans.
-      // Scaling step and minSeparation proportionally prevents edge-splitting.
-      final int step = math.max(2, (bodySpan * 0.022).round()).clamp(2, 6);
-      final double minSeparation = math.max(gWidth * 0.075, bodySpan * 0.15);
+      final int step = math.max(2, (gWidth * 0.018).round()).clamp(2, 6);
+      final double minSeparation = math.max(gWidth * 0.045, gWidth / (bandCount * 3.6));
 
-      // Estimate background ceramic body color (median color along body region)
-      final List<double> bodyLums = [];
-      for (int i = bodyMinIdx; i <= bodyMaxIdx && i < colColors.length; i++) {
-        final c = colColors[i];
-        bodyLums.add(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]);
-      }
-      final List<double> sortedBodyLum = List.from(bodyLums)..sort();
-      final double medianLum = sortedBodyLum.isNotEmpty
-          ? sortedBodyLum[sortedBodyLum.length ~/ 2]
-          : 150.0;
-
-      // Calculate stripe contrast score for each column
+      // Multi-feature stripe contrast score
       final List<double> rawScores = List.filled(colColors.length, 0.0);
       for (int i = step; i < colColors.length - step; i++) {
         final cur = colColors[i];
         final prev = colColors[i - step];
         final next = colColors[i + step];
 
-        // Gradient / edge magnitude across adaptive step
         final double edge = ((cur[0] - prev[0]).abs() + (next[0] - cur[0]).abs() +
                              (cur[1] - prev[1]).abs() + (next[1] - cur[1]).abs() +
-                             (cur[2] - prev[2]).abs() + (next[2] - cur[2]).abs()) / 3.0;
+                             (cur[2] - prev[2]).abs() + (next[2] - cur[2]).abs()) / 6.0;
 
-        // Color saturation (bands are far more saturated than tan/grey bodies)
+        final double dE = math.sqrt(
+          math.pow(cur[0] - bodyR, 2) +
+          math.pow(cur[1] - bodyG, 2) +
+          math.pow(cur[2] - bodyB, 2),
+        );
+
         final double maxC = math.max(cur[0], math.max(cur[1], cur[2]));
         final double minC = math.min(cur[0], math.min(cur[1], cur[2]));
         final double sat = maxC - minC;
 
-        // Contrast from median body luminance
         final double curLum = 0.299 * cur[0] + 0.587 * cur[1] + 0.114 * cur[2];
-        final double lumDiff = (curLum - medianLum).abs();
+        final double dLum = (curLum - bodyLum).abs();
 
-        rawScores[i] = sat * 1.6 + lumDiff * 1.2 + edge * 0.8;
+        rawScores[i] = dE * 1.0 + sat * 1.2 + dLum * 0.8 + edge * 0.6;
       }
 
       // Adaptive smoothing filter to remove sensor grain
@@ -425,9 +422,11 @@ class OpticalStripeDetector {
         scores[i] = (rawScores[i - 1] + rawScores[i] * 2.0 + rawScores[i + 1]) / 4.0;
       }
 
-      // Search peaks within adaptive ceramic body range (margin 4% of body span)
-      final int searchMin = math.max(step, (bodyMinIdx + bodySpan * 0.04).round());
-      final int searchMax = math.min(gWidth - step - 1, (bodyMaxIdx - bodySpan * 0.04).round());
+      final double maxScore = scores.isNotEmpty ? scores.reduce(math.max) : 0.0;
+      final double threshold = math.max(12.0, maxScore * 0.18);
+
+      final int searchMin = math.max(step, (bodyMinIdx + bodySpan * 0.02).round());
+      final int searchMax = math.min(gWidth - step - 1, (bodyMaxIdx - bodySpan * 0.02).round());
 
       final List<int> candidateIndices = [];
       for (int i = searchMin; i <= searchMax; i++) {
@@ -437,7 +436,7 @@ class OpticalStripeDetector {
 
       final List<int> peaks = [];
       for (final idx in candidateIndices) {
-        if (scores[idx] < 12.0) break; // noise floor
+        if (scores[idx] < threshold) break;
         bool tooClose = false;
         for (final p in peaks) {
           if ((p - idx).abs() < minSeparation) {
@@ -450,12 +449,9 @@ class OpticalStripeDetector {
           if (peaks.length >= bandCount + 5) break;
         }
       }
+      peaks.sort();
 
-      // -------------------------------------------------------------
-      // 3. SUB-PIXEL WEIGHTED CENTROID REFINEMENT
-      // -------------------------------------------------------------
-      // Wide zoomed stripes have broad peaks. Calculate the center of mass
-      // of each peak blob to center the wireframe on the physical stripe.
+      // Sub-pixel weighted centroid refinement
       final Map<int, double> refinedCentroids = {};
       for (final p in peaks) {
         final int rad = math.max(3, (step * 2).clamp(3, 10));
@@ -474,28 +470,36 @@ class OpticalStripeDetector {
 
       List<int>? chosenPeaks;
       if (peaks.length >= bandCount) {
-        peaks.sort();
-        if (peaks.length > bandCount) {
-          double bestQuality = -1.0;
+        if (peaks.length == bandCount) {
+          chosenPeaks = peaks;
+        } else {
+          double bestFitness = -1.0;
           List<int> bestSubset = peaks.sublist(0, bandCount);
-          for (int s = 0; s <= peaks.length - bandCount; s++) {
-            final subset = peaks.sublist(s, s + bandCount);
-            final double span = (subset.last - subset.first).toDouble();
-            if (span < bodySpan * 0.35 && peaks.length >= bandCount + 1) continue;
-            final double avgScore =
-                subset.map((p) => scores[p]).reduce((a, b) => a + b) / bandCount;
-            final double quality = avgScore * (1.0 + (span / bodySpan) * 0.6);
-            if (quality > bestQuality) {
-              bestQuality = quality;
-              bestSubset = subset;
+
+          void findBest(List<int> current, int start) {
+            if (current.length == bandCount) {
+              final double span = (current.last - current.first).toDouble();
+              if (span < bodySpan * 0.30 && peaks.length > bandCount) return;
+              final double avgScore =
+                  current.map((p) => scores[p]).reduce((a, b) => a + b) / bandCount;
+              final double fitness = avgScore * (1.0 + (span / bodySpan) * 0.7);
+              if (fitness > bestFitness) {
+                bestFitness = fitness;
+                bestSubset = List.from(current);
+              }
+              return;
+            }
+            for (int i = start; i < peaks.length; i++) {
+              current.add(peaks[i]);
+              findBest(current, i + 1);
+              current.removeLast();
             }
           }
+
+          findBest([], 0);
           chosenPeaks = bestSubset;
-        } else {
-          chosenPeaks = peaks;
         }
       } else if (peaks.length == bandCount - 1 && peaks.isNotEmpty) {
-        peaks.sort();
         final double avgGap = (peaks.last - peaks.first) / (peaks.length - 1);
         final int estLast = (peaks.last + avgGap * 1.1).round().clamp(searchMin, searchMax);
         peaks.add(estLast);
@@ -506,7 +510,20 @@ class OpticalStripeDetector {
 
       // If peaks found, map refined sub-pixel centroids to normalized 0..1 coordinates
       if (chosenPeaks != null && chosenPeaks.length == bandCount) {
-        final List<int> ordered = isReversed ? chosenPeaks.reversed.toList() : chosenPeaks;
+        bool finalReversed = isReversed;
+        final leftP = chosenPeaks.first;
+        final rightP = chosenPeaks.last;
+        final leftC = colColors[leftP];
+        final rightC = colColors[rightP];
+        final bool leftIsGold = leftC[0] > 135 && leftC[1] > 105 && leftC[2] < 135 && (leftC[0] - leftC[2]) > 20;
+        final bool rightIsGold = rightC[0] > 135 && rightC[1] > 105 && rightC[2] < 135 && (rightC[0] - rightC[2]) > 20;
+        if (leftIsGold && !rightIsGold) {
+          finalReversed = true;
+        } else if (rightIsGold && !leftIsGold) {
+          finalReversed = false;
+        }
+
+        final List<int> ordered = finalReversed ? chosenPeaks.reversed.toList() : chosenPeaks;
         return ordered.map((p) {
           final double c = refinedCentroids[p] ?? p.toDouble();
           return (c / gWidth).clamp(0.06, 0.94);
@@ -516,21 +533,19 @@ class OpticalStripeDetector {
       // -------------------------------------------------------------
       // 4. ZOOM-ADAPTIVE DYNAMIC FALLBACK
       // -------------------------------------------------------------
-      // If peak detection could not isolate all bands (e.g. glare), distribute
-      // bands proportionally across the detected ceramic body span.
       final List<double> relFractions;
       if (bandCount == 4) {
         relFractions = isReversed
-            ? [0.82, 0.60, 0.40, 0.18]
-            : [0.18, 0.40, 0.60, 0.82];
+            ? [0.88, 0.62, 0.38, 0.14]
+            : [0.14, 0.38, 0.62, 0.88];
       } else if (bandCount == 5) {
         relFractions = isReversed
-            ? [0.84, 0.68, 0.52, 0.36, 0.16]
-            : [0.16, 0.36, 0.52, 0.68, 0.84];
+            ? [0.90, 0.72, 0.54, 0.36, 0.12]
+            : [0.12, 0.36, 0.54, 0.72, 0.90];
       } else {
         relFractions = isReversed
-            ? [0.85, 0.71, 0.57, 0.43, 0.29, 0.15]
-            : [0.15, 0.29, 0.43, 0.57, 0.71, 0.85];
+            ? [0.90, 0.75, 0.60, 0.45, 0.30, 0.12]
+            : [0.12, 0.30, 0.45, 0.60, 0.75, 0.90];
       }
 
       return relFractions.map((f) {
@@ -582,66 +597,55 @@ class OpticalStripeDetector {
       if (gWidth < 40 || gHeight < 10) return false;
 
       final int yCenter = (gTop + gBottom) ~/ 2;
+      final int yRadius = math.max(2, (gHeight * 0.18).round());
 
-      // Sample columns across body to locate shoulders adaptively
-      int bodyMinIdx = (gWidth * 0.20).round();
-      int bodyMaxIdx = (gWidth * 0.80).round();
+      // Sample columns at left shoulder vs right shoulder
+      final int lStart = gLeft + (gWidth * 0.08).round();
+      final int lEnd = gLeft + (gWidth * 0.32).round();
+      final int rStart = gLeft + (gWidth * 0.68).round();
+      final int rEnd = gLeft + (gWidth * 0.92).round();
 
-      for (int x = gLeft; x < gRight - 3; x++) {
-        final p = decoded.getPixel(x, yCenter);
-        final chroma = math.max(p.r, math.max(p.g, p.b)) - math.min(p.r, math.min(p.g, p.b));
-        if (chroma > 14 && (p.r > p.b + 8 || p.g > p.b + 14)) {
-          bodyMinIdx = x - gLeft;
-          break;
-        }
-      }
-      for (int x = gRight - 1; x >= gLeft + 3; x--) {
-        final p = decoded.getPixel(x, yCenter);
-        final chroma = math.max(p.r, math.max(p.g, p.b)) - math.min(p.r, math.min(p.g, p.b));
-        if (chroma > 14 && (p.r > p.b + 8 || p.g > p.b + 14)) {
-          bodyMaxIdx = x - gLeft;
-          break;
-        }
+      bool isGoldLike(double r, double g, double b) {
+        return r > 135 && g > 105 && b < 135 && (r - b) > 20;
       }
 
-      final int bodySpan = math.max(20, bodyMaxIdx - bodyMinIdx);
-      final int lStart = gLeft + bodyMinIdx + (bodySpan * 0.06).round();
-      final int lEnd = gLeft + bodyMinIdx + (bodySpan * 0.22).round();
-      final int rStart = gLeft + bodyMinIdx + (bodySpan * 0.78).round();
-      final int rEnd = gLeft + bodyMinIdx + (bodySpan * 0.94).round();
-
+      int leftGoldCount = 0;
+      int rightGoldCount = 0;
       double leftLum = 0, rightLum = 0;
       int leftCount = 0, rightCount = 0;
 
-      for (int x = lStart; x <= lEnd; x++) {
-        for (int y = yCenter - 6; y <= yCenter + 6; y++) {
-          if ((y - yCenter).abs() <= 2) continue; // Avoid cyan reticle line
-          final p = decoded.getPixel(x.clamp(0, w - 1), y.clamp(0, h - 1));
-          leftLum += 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+      for (int x = lStart; x <= lEnd && x < w; x++) {
+        for (int y = yCenter - yRadius; y <= yCenter + yRadius; y++) {
+          if (y < 0 || y >= h) continue;
+          final p = decoded.getPixel(x, y);
+          final double r = p.r.toDouble(), g = p.g.toDouble(), b = p.b.toDouble();
+          leftLum += 0.299 * r + 0.587 * g + 0.114 * b;
           leftCount++;
+          if (isGoldLike(r, g, b)) leftGoldCount++;
         }
       }
-      for (int x = rStart; x <= rEnd; x++) {
-        for (int y = yCenter - 6; y <= yCenter + 6; y++) {
-          if ((y - yCenter).abs() <= 2) continue; // Avoid cyan reticle line
-          final p = decoded.getPixel(x.clamp(0, w - 1), y.clamp(0, h - 1));
-          rightLum += 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+
+      for (int x = rStart; x <= rEnd && x < w; x++) {
+        for (int y = yCenter - yRadius; y <= yCenter + yRadius; y++) {
+          if (y < 0 || y >= h) continue;
+          final p = decoded.getPixel(x, y);
+          final double r = p.r.toDouble(), g = p.g.toDouble(), b = p.b.toDouble();
+          rightLum += 0.299 * r + 0.587 * g + 0.114 * b;
           rightCount++;
+          if (isGoldLike(r, g, b)) rightGoldCount++;
         }
       }
+
+      if (leftGoldCount > rightGoldCount + 20) return true;
+      if (rightGoldCount > leftGoldCount + 20) return false;
 
       final double avgLeftLum = leftCount > 0 ? leftLum / leftCount : 0.0;
       final double avgRightLum = rightCount > 0 ? rightLum / rightCount : 0.0;
-
-      if (avgLeftLum > avgRightLum + 12.0) {
-        return true;
-      }
+      if (avgLeftLum > avgRightLum + 12.0) return true;
     } catch (_) {}
     return false;
   }
 }
-
-/// Interactive overlay widget positioned directly over the captured resistor image.
 class InteractiveBandOverlay extends StatefulWidget {
   final int bandCount;
   final int band1Index;
@@ -700,31 +704,29 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
   void _initPositions() {
     bool isReversed = false;
 
-    // 1. Priority A: Check if detectedAxisPositions indicates right-to-left
-    if (widget.detectedAxisPositions != null && widget.detectedAxisPositions!.length >= 2) {
+    // 1. Priority A: Tolerance color rule (Gold/Silver is always the last band)
+    final int tolIndex = widget.bandCount == 4
+        ? widget.band4Index
+        : (widget.bandCount == 5 ? widget.band5Index : widget.band6Index);
+    final tolColor = ResistorScannerService.toleranceColors[
+        tolIndex.clamp(0, ResistorScannerService.toleranceColors.length - 1)];
+
+    if (widget.capturedImageBytes != null &&
+        (tolColor.name == 'Gold' || tolColor.name == 'Silver')) {
+      isReversed = OpticalStripeDetector.detectIsReversed(
+        widget.capturedImageBytes,
+        widget.bandCount,
+        viewportWidth: widget.viewportWidth,
+        viewportHeight: widget.viewportHeight,
+      );
+    } else if (widget.detectedAxisPositions != null &&
+        widget.detectedAxisPositions!.length >= 2) {
       if (widget.detectedAxisPositions!.first > widget.detectedAxisPositions!.last) {
         isReversed = true;
       }
-    } else {
-      // 2. Priority B: Tolerance color rule (Gold/Silver is always the last band)
-      final int tolIndex = widget.bandCount == 4
-          ? widget.band4Index
-          : (widget.bandCount == 5 ? widget.band5Index : widget.band6Index);
-      final tolColor = ResistorScannerService.toleranceColors[
-          tolIndex.clamp(0, ResistorScannerService.toleranceColors.length - 1)];
-      if (tolColor.name == 'Gold' || tolColor.name == 'Silver') {
-        if (widget.capturedImageBytes != null) {
-          isReversed = OpticalStripeDetector.detectIsReversed(
-            widget.capturedImageBytes,
-            widget.bandCount,
-            viewportWidth: widget.viewportWidth,
-            viewportHeight: widget.viewportHeight,
-          );
-        }
-      }
     }
 
-    // 3. Priority C: Optical stripe detector on actual image bytes
+    // 2. Priority B: Optical stripe detector on actual image bytes
     if (widget.capturedImageBytes != null) {
       final opticalStripes = OpticalStripeDetector.detectStripes(
         widget.capturedImageBytes,
@@ -739,29 +741,29 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       }
     }
 
-    // 4. Priority D: Detected physical candidate positions mapped to guide
+    // 3. Priority C: Detected physical candidate positions mapped to guide
     if (widget.detectedAxisPositions != null &&
         widget.detectedAxisPositions!.length == widget.bandCount) {
       _bandNormalizedX = List.from(widget.detectedAxisPositions!);
       return;
     }
 
-    // 5. Fallback: Calibrated physical axial resistor stripe anchors across ceramic body
+    // 4. Fallback: Calibrated physical axial resistor stripe anchors across ceramic body
     if (isReversed) {
       if (widget.bandCount == 4) {
-        _bandNormalizedX = [0.70, 0.58, 0.46, 0.35];
+        _bandNormalizedX = [0.78, 0.58, 0.40, 0.22];
       } else if (widget.bandCount == 5) {
-        _bandNormalizedX = [0.70, 0.61, 0.52, 0.43, 0.35];
+        _bandNormalizedX = [0.80, 0.65, 0.50, 0.35, 0.20];
       } else {
-        _bandNormalizedX = [0.72, 0.64, 0.57, 0.50, 0.42, 0.34];
+        _bandNormalizedX = [0.80, 0.68, 0.56, 0.44, 0.32, 0.20];
       }
     } else {
       if (widget.bandCount == 4) {
-        _bandNormalizedX = [0.35, 0.46, 0.58, 0.70];
+        _bandNormalizedX = [0.22, 0.40, 0.58, 0.78];
       } else if (widget.bandCount == 5) {
-        _bandNormalizedX = [0.35, 0.43, 0.52, 0.61, 0.70];
+        _bandNormalizedX = [0.20, 0.35, 0.50, 0.65, 0.80];
       } else {
-        _bandNormalizedX = [0.34, 0.42, 0.50, 0.57, 0.64, 0.72];
+        _bandNormalizedX = [0.20, 0.32, 0.44, 0.56, 0.68, 0.80];
       }
     }
   }
@@ -828,19 +830,19 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     setState(() {
       if (isReversed) {
         if (widget.bandCount == 4) {
-          _bandNormalizedX = [0.70, 0.58, 0.46, 0.35];
+          _bandNormalizedX = [0.78, 0.58, 0.40, 0.22];
         } else if (widget.bandCount == 5) {
-          _bandNormalizedX = [0.70, 0.61, 0.52, 0.43, 0.35];
+          _bandNormalizedX = [0.80, 0.65, 0.50, 0.35, 0.20];
         } else {
-          _bandNormalizedX = [0.72, 0.64, 0.57, 0.50, 0.42, 0.34];
+          _bandNormalizedX = [0.80, 0.68, 0.56, 0.44, 0.32, 0.20];
         }
       } else {
         if (widget.bandCount == 4) {
-          _bandNormalizedX = [0.35, 0.46, 0.58, 0.70];
+          _bandNormalizedX = [0.22, 0.40, 0.58, 0.78];
         } else if (widget.bandCount == 5) {
-          _bandNormalizedX = [0.35, 0.43, 0.52, 0.61, 0.70];
+          _bandNormalizedX = [0.20, 0.35, 0.50, 0.65, 0.80];
         } else {
-          _bandNormalizedX = [0.34, 0.42, 0.50, 0.57, 0.64, 0.72];
+          _bandNormalizedX = [0.20, 0.32, 0.44, 0.56, 0.68, 0.80];
         }
       }
     });

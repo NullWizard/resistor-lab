@@ -1,3 +1,4 @@
+import 'dart:io' as io;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,6 +108,22 @@ void main() {
       expect(detected[2] < detected[3], isTrue);
       // Zoomed stripes span broadly across the guide box (> 0.60 total span)
       expect(detected.last - detected.first > 0.60, isTrue);
+    });
+
+    test('Test on user image file', () {
+      final file = io.File(r'C:\Users\spjen\.gemini\antigravity\brain\2e96059d-428e-4633-ba2a-42b8adcbe878\scratch\simulated_processed.png');
+      if (file.existsSync()) {
+        final bytes = file.readAsBytesSync();
+        final detected = OpticalStripeDetector.detectStripes(
+          bytes,
+          4,
+          viewportWidth: 670,
+          viewportHeight: 430,
+          isReversed: true,
+        );
+        expect(detected, isNotNull);
+        expect(detected!.length, 4);
+      }
     });
 
     test('Gracefully returns null on empty or invalid bytes', () {
