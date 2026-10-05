@@ -361,8 +361,8 @@ class OpticalStripeDetector {
         scores[i] = (rawScores[i - 1] + rawScores[i] * 2.0 + rawScores[i + 1]) / 4.0;
       }
 
-      // Physical minimum separation between bands on axial ceramic body (5.5% of guide width)
-      final double minSeparation = gWidth * 0.055;
+      // Physical minimum separation between bands on axial ceramic body (7.5% of guide width)
+      final double minSeparation = gWidth * 0.075;
       final List<int> peaks = [];
 
       // Sort candidate columns by score descending
@@ -372,7 +372,7 @@ class OpticalStripeDetector {
       for (final idx in indices) {
         if (scores[idx] < 12.0) break; // noise floor
         final double norm = idx / gWidth;
-        if (norm < 0.18 || norm > 0.82) continue; // skip outer wire leads
+        if (norm < 0.15 || norm > 0.89) continue; // skip outer wire leads
         bool tooClose = false;
         for (final p in peaks) {
           if ((p - idx).abs() < minSeparation) {
@@ -382,7 +382,7 @@ class OpticalStripeDetector {
         }
         if (!tooClose) {
           peaks.add(idx);
-          if (peaks.length >= bandCount + 3) break;
+          if (peaks.length >= bandCount + 4) break;
         }
       }
 
@@ -390,13 +390,17 @@ class OpticalStripeDetector {
       if (peaks.length >= bandCount) {
         peaks.sort();
         if (peaks.length > bandCount) {
-          double bestAvgScore = -1.0;
+          double bestQuality = -1.0;
           List<int> bestSubset = peaks.sublist(0, bandCount);
           for (int s = 0; s <= peaks.length - bandCount; s++) {
             final subset = peaks.sublist(s, s + bandCount);
-            final double avgScore = subset.map((p) => scores[p]).reduce((a, b) => a + b) / bandCount;
-            if (avgScore > bestAvgScore) {
-              bestAvgScore = avgScore;
+            final double span = (subset.last - subset.first) / gWidth;
+            if (span < 0.22 && peaks.length >= bandCount + 1) continue; // Physical span across axial resistor
+            final double avgScore =
+                subset.map((p) => scores[p]).reduce((a, b) => a + b) / bandCount;
+            final double quality = avgScore * (1.0 + span * 0.6);
+            if (quality > bestQuality) {
+              bestQuality = quality;
               bestSubset = subset;
             }
           }
@@ -464,15 +468,17 @@ class OpticalStripeDetector {
       final int yCenter = (gTop + gBottom) ~/ 2;
       double leftLum = 0, rightLum = 0;
       int leftCount = 0, rightCount = 0;
-      for (int x = gLeft + (gWidth * 0.22).round(); x <= gLeft + (gWidth * 0.32).round(); x++) {
-        for (int y = yCenter - 4; y <= yCenter + 4; y++) {
+      // Sample left bulbous shoulder (Gold tolerance band area: 0.26..0.38)
+      for (int x = gLeft + (gWidth * 0.26).round(); x <= gLeft + (gWidth * 0.38).round(); x++) {
+        for (int y = yCenter - 5; y <= yCenter + 5; y++) {
           final p = decoded.getPixel(x.clamp(0, w - 1), y.clamp(0, h - 1));
           leftLum += 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
           leftCount++;
         }
       }
-      for (int x = gLeft + (gWidth * 0.50).round(); x <= gLeft + (gWidth * 0.62).round(); x++) {
-        for (int y = yCenter - 4; y <= yCenter + 4; y++) {
+      // Sample right bulbous shoulder (Digit 1 dark stripe area: 0.65..0.78)
+      for (int x = gLeft + (gWidth * 0.65).round(); x <= gLeft + (gWidth * 0.78).round(); x++) {
+        for (int y = yCenter - 5; y <= yCenter + 5; y++) {
           final p = decoded.getPixel(x.clamp(0, w - 1), y.clamp(0, h - 1));
           rightLum += 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
           rightCount++;
@@ -590,28 +596,26 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     // 4. Priority D: Detected physical candidate positions mapped to guide
     if (widget.detectedAxisPositions != null &&
         widget.detectedAxisPositions!.length == widget.bandCount) {
-      _bandNormalizedX = widget.detectedAxisPositions!
-          .map((x) => (0.24 + x * 0.36).clamp(0.12, 0.88))
-          .toList();
+      _bandNormalizedX = List.from(widget.detectedAxisPositions!);
       return;
     }
 
-    // 5. Fallback: Calibrated physical axial resistor stripe anchors on central ceramic body
+    // 5. Fallback: Calibrated physical axial resistor stripe anchors across ceramic body
     if (isReversed) {
       if (widget.bandCount == 4) {
-        _bandNormalizedX = [0.54, 0.45, 0.36, 0.26];
+        _bandNormalizedX = [0.70, 0.58, 0.46, 0.35];
       } else if (widget.bandCount == 5) {
-        _bandNormalizedX = [0.55, 0.47, 0.40, 0.33, 0.26];
+        _bandNormalizedX = [0.70, 0.61, 0.52, 0.43, 0.35];
       } else {
-        _bandNormalizedX = [0.56, 0.49, 0.43, 0.37, 0.31, 0.25];
+        _bandNormalizedX = [0.72, 0.64, 0.57, 0.50, 0.42, 0.34];
       }
     } else {
       if (widget.bandCount == 4) {
-        _bandNormalizedX = [0.26, 0.36, 0.45, 0.54];
+        _bandNormalizedX = [0.35, 0.46, 0.58, 0.70];
       } else if (widget.bandCount == 5) {
-        _bandNormalizedX = [0.26, 0.33, 0.40, 0.47, 0.55];
+        _bandNormalizedX = [0.35, 0.43, 0.52, 0.61, 0.70];
       } else {
-        _bandNormalizedX = [0.25, 0.31, 0.37, 0.43, 0.49, 0.56];
+        _bandNormalizedX = [0.34, 0.42, 0.50, 0.57, 0.64, 0.72];
       }
     }
   }
@@ -663,19 +667,19 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       final bool isReversed = _bandNormalizedX.first > _bandNormalizedX.last;
       if (isReversed) {
         if (widget.bandCount == 4) {
-          _bandNormalizedX = [0.54, 0.45, 0.36, 0.26];
+          _bandNormalizedX = [0.70, 0.58, 0.46, 0.35];
         } else if (widget.bandCount == 5) {
-          _bandNormalizedX = [0.55, 0.47, 0.40, 0.33, 0.26];
+          _bandNormalizedX = [0.70, 0.61, 0.52, 0.43, 0.35];
         } else {
-          _bandNormalizedX = [0.56, 0.49, 0.43, 0.37, 0.31, 0.25];
+          _bandNormalizedX = [0.72, 0.64, 0.57, 0.50, 0.42, 0.34];
         }
       } else {
         if (widget.bandCount == 4) {
-          _bandNormalizedX = [0.26, 0.36, 0.45, 0.54];
+          _bandNormalizedX = [0.35, 0.46, 0.58, 0.70];
         } else if (widget.bandCount == 5) {
-          _bandNormalizedX = [0.26, 0.33, 0.40, 0.47, 0.55];
+          _bandNormalizedX = [0.35, 0.43, 0.52, 0.61, 0.70];
         } else {
-          _bandNormalizedX = [0.25, 0.31, 0.37, 0.43, 0.49, 0.56];
+          _bandNormalizedX = [0.34, 0.42, 0.50, 0.57, 0.64, 0.72];
         }
       }
     });
@@ -741,7 +745,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     final double bandRectHeight = guideHeight * 0.72;
     final double bandRectWidth =
         (guideWidth / (widget.bandCount + 2.5)).clamp(15.0, 24.0);
-    const double boxWidth = 98.0;
+    const double boxWidth = 104.0;
     const double minGap = 6.0;
     final double minLeft = 6.0;
     final double maxLeft = widget.viewportWidth - boxWidth - 6.0;
@@ -1045,7 +1049,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     required _BandPlacement placement,
     required double guideWidth,
   }) {
-    const double boxWidth = 98.0;
+    const double boxWidth = 104.0;
     const double boxHeight = 32.0;
 
     final double boxLeft = placement.boxLeft;
@@ -1104,7 +1108,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
               ),
             ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1127,7 +1131,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
                   ],
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               // Band Name
               Expanded(
                 child: Text(
@@ -1135,10 +1139,10 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.spaceGrotesk(
-                    fontSize: 10.5,
+                    fontSize: 10.0,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    letterSpacing: 0.2,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),
@@ -1221,7 +1225,7 @@ class _BandOverlayLinesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const double boxHeight = 32.0;
-    const double boxWidth = 98.0;
+    const double boxWidth = 104.0;
 
     for (final p in placements) {
       final isBlack = p.info.color == const Color(0xFF212121) ||
