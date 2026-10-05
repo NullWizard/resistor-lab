@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image/image.dart' as img;
 import '../services/resistor_scanner_service.dart';
 
 /// Data model representing a color choice with probability ranking.
@@ -258,6 +261,159 @@ class BandProbabilityResult {
   });
 }
 
+/// Optical stripe detector scanning the real image pixels for resistor band peaks.
+class OpticalStripeDetector {
+  static List<double>? detectStripes(
+    Uint8List? imageBytes,
+    int bandCount, {
+    double? viewportWidth,
+    double? viewportHeight,
+  }) {
+    if (imageBytes == null || imageBytes.isEmpty) return null;
+    try {
+      final decoded = img.decodeImage(imageBytes);
+      if (decoded == null || decoded.width < 50 || decoded.height < 30) return null;
+
+      final int w = decoded.width;
+      final int h = decoded.height;
+
+      // Guide box region in image coordinates accounting for BoxFit.cover
+      int gLeft, gRight, gTop, gBottom;
+      if (viewportWidth != null && viewportHeight != null && viewportWidth > 0 && viewportHeight > 0) {
+        final double scale = math.max(viewportWidth / w, viewportHeight / h);
+        final double renderedW = w * scale;
+        final double renderedH = h * scale;
+        final double cropX = (renderedW - viewportWidth) / 2.0;
+        final double cropY = (renderedH - viewportHeight) / 2.0;
+        final double guideViewLeft = viewportWidth * 0.20;
+        final double guideViewRight = viewportWidth * 0.80;
+        final double guideViewTop = viewportHeight * 0.35;
+        final double guideViewBottom = viewportHeight * 0.65;
+        gLeft = ((guideViewLeft + cropX) / scale).clamp(0.0, w - 1.0).round();
+        gRight = ((guideViewRight + cropX) / scale).clamp(0.0, w - 1.0).round();
+        gTop = ((guideViewTop + cropY) / scale).clamp(0.0, h - 1.0).round();
+        gBottom = ((guideViewBottom + cropY) / scale).clamp(0.0, h - 1.0).round();
+      } else {
+        gLeft = (w * 0.20).round();
+        gRight = (w * 0.80).round();
+        gTop = (h * 0.35).round();
+        gBottom = (h * 0.65).round();
+      }
+
+      final int gWidth = gRight - gLeft;
+      final int gHeight = gBottom - gTop;
+      if (gWidth < 40 || gHeight < 10) return null;
+
+      // Multi-slice horizontal strip across the resistor body (central 50% of guide height)
+      final int yMin = (gTop + gHeight * 0.25).round().clamp(0, h - 1);
+      final int yMax = (gTop + gHeight * 0.75).round().clamp(0, h - 1);
+
+      // Compute average column RGB profile across the vertical slice
+      final List<List<double>> colColors = [];
+      for (int x = gLeft; x < gRight; x++) {
+        double rSum = 0, gSum = 0, bSum = 0;
+        int count = 0;
+        for (int y = yMin; y <= yMax; y++) {
+          final p = decoded.getPixel(x, y);
+          rSum += p.r;
+          gSum += p.g;
+          bSum += p.b;
+          count++;
+        }
+        colColors.add([rSum / count, gSum / count, bSum / count]);
+      }
+
+      // Estimate background ceramic body color (median color along the strip)
+      final List<double> lumList = colColors
+          .map((c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2])
+          .toList();
+      final List<double> sortedLum = List.from(lumList)..sort();
+      final double medianLum = sortedLum[sortedLum.length ~/ 2];
+
+      // Calculate stripe contrast score for each column
+      final List<double> rawScores = List.filled(colColors.length, 0.0);
+      for (int i = 2; i < colColors.length - 2; i++) {
+        final cur = colColors[i];
+        final prev = colColors[i - 2];
+        final next = colColors[i + 2];
+
+        // Gradient / edge magnitude
+        final double edge = ((cur[0] - prev[0]).abs() + (next[0] - cur[0]).abs() +
+                             (cur[1] - prev[1]).abs() + (next[1] - cur[1]).abs() +
+                             (cur[2] - prev[2]).abs() + (next[2] - cur[2]).abs()) / 3.0;
+
+        // Color saturation (bands are often much more saturated than tan/grey bodies)
+        final double maxC = math.max(cur[0], math.max(cur[1], cur[2]));
+        final double minC = math.min(cur[0], math.min(cur[1], cur[2]));
+        final double sat = maxC - minC;
+
+        // Contrast from median body luminance
+        final double curLum = 0.299 * cur[0] + 0.587 * cur[1] + 0.114 * cur[2];
+        final double lumDiff = (curLum - medianLum).abs();
+
+        rawScores[i] = edge * 1.5 + sat * 1.2 + lumDiff * 0.8;
+      }
+
+      // 3-point smoothing filter to remove sensor noise
+      final List<double> scores = List.filled(rawScores.length, 0.0);
+      for (int i = 1; i < rawScores.length - 1; i++) {
+        scores[i] = (rawScores[i - 1] + rawScores[i] * 2.0 + rawScores[i + 1]) / 4.0;
+      }
+
+      // Find local maxima / peak clusters with minimum distance separation
+      final double minSeparation = gWidth / (bandCount + 3.0);
+      final List<int> peaks = [];
+
+      // Sort candidate columns by score descending
+      final List<int> indices = List.generate(scores.length, (i) => i);
+      indices.sort((a, b) => scores[b].compareTo(scores[a]));
+
+      for (final idx in indices) {
+        if (scores[idx] < 10.0) break; // noise floor
+        bool tooClose = false;
+        for (final p in peaks) {
+          if ((p - idx).abs() < minSeparation) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (!tooClose) {
+          peaks.add(idx);
+          if (peaks.length >= bandCount + 2) break;
+        }
+      }
+
+      if (peaks.length >= bandCount) {
+        peaks.sort();
+        // If more peaks detected than required, pick the contiguous subset with highest scores
+        if (peaks.length > bandCount) {
+          double bestAvgScore = -1.0;
+          List<int> bestSubset = peaks.sublist(0, bandCount);
+          for (int s = 0; s <= peaks.length - bandCount; s++) {
+            final subset = peaks.sublist(s, s + bandCount);
+            final double avgScore = subset.map((p) => scores[p]).reduce((a, b) => a + b) / bandCount;
+            if (avgScore > bestAvgScore) {
+              bestAvgScore = avgScore;
+              bestSubset = subset;
+            }
+          }
+          return bestSubset.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
+        }
+        return peaks.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
+      } else if (peaks.length == bandCount - 1 && peaks.isNotEmpty) {
+        // Interpolate missing tolerance or digit band based on average spacing
+        peaks.sort();
+        final double avgGap = (peaks.last - peaks.first) / (peaks.length - 1);
+        final int estLast = (peaks.last + avgGap * 1.3).round().clamp(0, gWidth - 1);
+        peaks.add(estLast);
+        peaks.sort();
+        return peaks.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
+      }
+    } catch (_) {}
+    return null;
+  }
+}
+
 /// Interactive overlay widget positioned directly over the captured resistor image.
 class InteractiveBandOverlay extends StatefulWidget {
   final int bandCount;
@@ -271,6 +427,7 @@ class InteractiveBandOverlay extends StatefulWidget {
   final double viewportWidth;
   final double viewportHeight;
   final List<double>? detectedAxisPositions;
+  final Uint8List? capturedImageBytes;
 
   const InteractiveBandOverlay({
     super.key,
@@ -285,6 +442,7 @@ class InteractiveBandOverlay extends StatefulWidget {
     required this.viewportWidth,
     required this.viewportHeight,
     this.detectedAxisPositions,
+    this.capturedImageBytes,
   });
 
   @override
@@ -294,6 +452,7 @@ class InteractiveBandOverlay extends StatefulWidget {
 class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
   late List<double> _bandNormalizedX;
   int? _activeBandIndex;
+  bool _isAlignmentMode = false;
 
   @override
   void initState() {
@@ -305,13 +464,28 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
   void didUpdateWidget(covariant InteractiveBandOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.bandCount != widget.bandCount ||
-        oldWidget.detectedAxisPositions != widget.detectedAxisPositions) {
+        oldWidget.detectedAxisPositions != widget.detectedAxisPositions ||
+        oldWidget.capturedImageBytes != widget.capturedImageBytes) {
       _initPositions();
     }
   }
 
   void _initPositions() {
-    // If detected physical positions are provided from scan, use them
+    // 1. First priority: Optical stripe detector on actual image bytes
+    if (widget.capturedImageBytes != null) {
+      final opticalStripes = OpticalStripeDetector.detectStripes(
+        widget.capturedImageBytes,
+        widget.bandCount,
+        viewportWidth: widget.viewportWidth,
+        viewportHeight: widget.viewportHeight,
+      );
+      if (opticalStripes != null && opticalStripes.length == widget.bandCount) {
+        _bandNormalizedX = opticalStripes;
+        return;
+      }
+    }
+
+    // 2. Second priority: Detected physical candidate positions
     if (widget.detectedAxisPositions != null &&
         widget.detectedAxisPositions!.length == widget.bandCount) {
       _bandNormalizedX = widget.detectedAxisPositions!
@@ -320,14 +494,58 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       return;
     }
 
-    // Calibrated axial resistor stripe distribution (accounting for standard tolerance gap)
+    // 3. Fallback: Calibrated physical axial resistor stripe anchors
     if (widget.bandCount == 4) {
-      _bandNormalizedX = [0.24, 0.40, 0.56, 0.78];
+      _bandNormalizedX = [0.22, 0.38, 0.54, 0.78];
     } else if (widget.bandCount == 5) {
-      _bandNormalizedX = [0.22, 0.35, 0.48, 0.61, 0.78];
+      _bandNormalizedX = [0.20, 0.34, 0.48, 0.62, 0.78];
     } else {
-      _bandNormalizedX = [0.20, 0.32, 0.44, 0.56, 0.68, 0.80];
+      _bandNormalizedX = [0.18, 0.30, 0.42, 0.54, 0.66, 0.80];
     }
+  }
+
+  void _shiftAll(double delta) {
+    setState(() {
+      _bandNormalizedX = _bandNormalizedX
+          .map((x) => (x + delta).clamp(0.06, 0.94))
+          .toList();
+    });
+  }
+
+  void _scaleSpacing(double factor) {
+    setState(() {
+      final double center =
+          _bandNormalizedX.reduce((a, b) => a + b) / _bandNormalizedX.length;
+      _bandNormalizedX = _bandNormalizedX.map((x) {
+        return (center + (x - center) * factor).clamp(0.06, 0.94);
+      }).toList();
+    });
+  }
+
+  void _autoDetect() {
+    final detected = OpticalStripeDetector.detectStripes(
+      widget.capturedImageBytes,
+      widget.bandCount,
+      viewportWidth: widget.viewportWidth,
+      viewportHeight: widget.viewportHeight,
+    );
+    if (detected != null && detected.length == widget.bandCount) {
+      setState(() {
+        _bandNormalizedX = List.from(detected);
+      });
+    }
+  }
+
+  void _resetPositions() {
+    setState(() {
+      if (widget.bandCount == 4) {
+        _bandNormalizedX = [0.22, 0.38, 0.54, 0.78];
+      } else if (widget.bandCount == 5) {
+        _bandNormalizedX = [0.20, 0.34, 0.48, 0.62, 0.78];
+      } else {
+        _bandNormalizedX = [0.18, 0.30, 0.42, 0.54, 0.66, 0.80];
+      }
+    });
   }
 
   ResistorBandInfo _getBandInfo(int index) {
@@ -430,49 +648,206 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
         for (final p in placements)
           _buildInteractiveBox(
             placement: p,
+            guideWidth: guideWidth,
           ),
 
         // Layer C: Interactive Touch Targets over the highlighted rectangle wireframes
         for (final p in placements)
-          _buildBandWireframeTouchTarget(p),
+          _buildBandWireframeTouchTarget(p, guideWidth),
 
-        // Layer D: Top Hint Bar
+        // Layer D: Top Controls Bar (Alignment Mode Toggle & Status Hint)
         Positioned(
-          top: 10,
-          right: 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.touch_app_rounded,
-                    color: Color(0xFF00E5FF), size: 13),
-                const SizedBox(width: 4),
-                Text(
-                  'TAP BOX TO EDIT',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF00E5FF),
-                    letterSpacing: 0.5,
+          top: 8,
+          right: 10,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Hint Tag
+              IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    _isAlignmentMode ? 'SLIDE BANDS TO STRIPES' : 'TAP BOX TO EDIT',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: _isAlignmentMode
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF00E5FF),
+                      letterSpacing: 0.4,
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 6),
+              // Alignment Toggle Button
+              GestureDetector(
+                onTap: () => setState(() => _isAlignmentMode = !_isAlignmentMode),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _isAlignmentMode
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF0B132B).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _isAlignmentMode
+                          ? Colors.white
+                          : const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _isAlignmentMode
+                            ? const Color(0xFF10B981).withValues(alpha: 0.5)
+                            : Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isAlignmentMode
+                            ? Icons.check_circle_rounded
+                            : Icons.tune_rounded,
+                        color: Colors.white,
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isAlignmentMode ? 'DONE' : 'ALIGN',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
+
+        // Layer E: Floating Fine-Tune Alignment Toolbar (Active only in Alignment Mode)
+        if (_isAlignmentMode)
+          Positioned(
+            bottom: 50,
+            left: 10,
+            right: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF060B18).withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.55),
+                    width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.8),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildHudBtn(
+                      icon: Icons.arrow_back_rounded,
+                      label: 'Shift L',
+                      onTap: () => _shiftAll(-0.02),
+                    ),
+                    const SizedBox(width: 4),
+                    _buildHudBtn(
+                      icon: Icons.arrow_forward_rounded,
+                      label: 'Shift R',
+                      onTap: () => _shiftAll(0.02),
+                    ),
+                    const SizedBox(width: 4),
+                    _buildHudBtn(
+                      icon: Icons.unfold_less_rounded,
+                      label: 'Closer',
+                      onTap: () => _scaleSpacing(0.92),
+                    ),
+                    const SizedBox(width: 4),
+                    _buildHudBtn(
+                      icon: Icons.unfold_more_rounded,
+                      label: 'Wider',
+                      onTap: () => _scaleSpacing(1.08),
+                    ),
+                    const SizedBox(width: 4),
+                    _buildHudBtn(
+                      icon: Icons.auto_awesome_rounded,
+                      label: 'Auto',
+                      onTap: _autoDetect,
+                    ),
+                    const SizedBox(width: 4),
+                    _buildHudBtn(
+                      icon: Icons.refresh_rounded,
+                      label: 'Reset',
+                      onTap: _resetPositions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildHudBtn({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: const Color(0xFF00E5FF), size: 12),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildInteractiveBox({
     required _BandPlacement placement,
+    required double guideWidth,
   }) {
     const double boxWidth = 88.0;
     const double boxHeight = 32.0;
@@ -494,7 +869,21 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       height: boxHeight,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _openColorPicker(placement.bandIndex),
+        onTap: () {
+          if (!_isAlignmentMode) {
+            _openColorPicker(placement.bandIndex);
+          }
+        },
+        onHorizontalDragUpdate: _isAlignmentMode
+            ? (details) {
+                setState(() {
+                  final double deltaNorm = details.delta.dx / guideWidth;
+                  _bandNormalizedX[placement.bandIndex] =
+                      (_bandNormalizedX[placement.bandIndex] + deltaNorm)
+                          .clamp(0.06, 0.94);
+                });
+              }
+            : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
@@ -559,7 +948,9 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
                 ),
               ),
               Icon(
-                Icons.arrow_drop_down_rounded,
+                _isAlignmentMode
+                    ? Icons.drag_indicator_rounded
+                    : Icons.arrow_drop_down_rounded,
                 color: const Color(0xFF00E5FF).withValues(alpha: 0.85),
                 size: 14,
               ),
@@ -570,7 +961,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     );
   }
 
-  Widget _buildBandWireframeTouchTarget(_BandPlacement placement) {
+  Widget _buildBandWireframeTouchTarget(_BandPlacement placement, double guideWidth) {
     const double pad = 8.0;
     return Positioned(
       left: placement.bandRect.left - pad,
@@ -579,7 +970,21 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       height: placement.bandRect.height + pad * 2,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _openColorPicker(placement.bandIndex),
+        onTap: () {
+          if (!_isAlignmentMode) {
+            _openColorPicker(placement.bandIndex);
+          }
+        },
+        onHorizontalDragUpdate: _isAlignmentMode
+            ? (details) {
+                setState(() {
+                  final double deltaNorm = details.delta.dx / guideWidth;
+                  _bandNormalizedX[placement.bandIndex] =
+                      (_bandNormalizedX[placement.bandIndex] + deltaNorm)
+                          .clamp(0.06, 0.94);
+                });
+              }
+            : null,
         child: Container(
           color: Colors.transparent, // Expanded touch target directly over the highlighted stripe
         ),

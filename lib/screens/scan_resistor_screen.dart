@@ -772,17 +772,19 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                       band5Index: _band5,
                       band6Index: _band6,
                       detectedAxisPositions: _detectedBandPositions,
+                      capturedImageBytes: _capturedImageBytes,
                       onBandColorChanged: _onBandColorChanged,
                       viewportWidth: _viewportWidth,
                       viewportHeight: _viewportHeight,
                     ),
                   ),
 
-                // Layer 3: Top Status Badge (Left)
-                Positioned(
-                  top: 12,
-                  left: 14,
-                  child: Container(
+                // Layer 3: Top Status Badge (Left) - Only in live guide view
+                if (_capturedImageBytes == null)
+                  Positioned(
+                    top: 12,
+                    left: 14,
+                    child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.70),
