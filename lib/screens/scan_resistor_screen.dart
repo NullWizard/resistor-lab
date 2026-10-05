@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/resistor_scanner_service.dart';
 import '../services/scanner/scanner_coordinator.dart';
 import '../widgets/glass_components.dart';
+import '../widgets/interactive_band_overlay.dart';
 
 /// Screen for scanning resistors via camera or gallery image.
 class ScanResistorScreen extends StatefulWidget {
@@ -438,6 +439,56 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     }
   }
 
+  void _onBandColorChanged(int bandIndex, int newColorIndex) {
+    setState(() {
+      switch (bandIndex) {
+        case 0:
+          _band1 = newColorIndex;
+          break;
+        case 1:
+          _band2 = newColorIndex;
+          break;
+        case 2:
+          _band3 = newColorIndex;
+          break;
+        case 3:
+          _band4 = newColorIndex;
+          break;
+        case 4:
+          _band5 = newColorIndex;
+          break;
+        case 5:
+          _band6 = newColorIndex;
+          break;
+      }
+      _clampBandIndices();
+    });
+  }
+
+  void _openBandColorPicker(int bandIndex) {
+    int curVal = 0;
+    switch (bandIndex) {
+      case 0: curVal = _band1; break;
+      case 1: curVal = _band2; break;
+      case 2: curVal = _band3; break;
+      case 3: curVal = _band4; break;
+      case 4: curVal = _band5; break;
+      case 5: curVal = _band6; break;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => BandColorPickerModal(
+        bandIndex: bandIndex,
+        bandCount: _selectedBandCount,
+        currentValue: curVal,
+        onColorSelected: (newVal) => _onBandColorChanged(bandIndex, newVal),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final calculation = ResistorScannerService.calculate(
@@ -693,6 +744,24 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                     ),
                   ),
                 ),
+
+                // Layer 2b: Interactive Band Overlay with Pointing Arrows & Color Selector
+                if (_capturedImageBytes != null && !_hasScanError)
+                  Positioned.fill(
+                    child: InteractiveBandOverlay(
+                      key: const Key('interactive_band_overlay'),
+                      bandCount: _selectedBandCount,
+                      band1Index: _band1,
+                      band2Index: _band2,
+                      band3Index: _band3,
+                      band4Index: _band4,
+                      band5Index: _band5,
+                      band6Index: _band6,
+                      onBandColorChanged: _onBandColorChanged,
+                      viewportWidth: _viewportWidth,
+                      viewportHeight: _viewportHeight,
+                    ),
+                  ),
 
                 // Layer 3: Top Status Badge (Left)
                 Positioned(
@@ -1178,22 +1247,39 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
+              Row(
+                children: const [
+                  Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF00E5FF)),
+                  SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'Tap any band arrow on the image above (or tap chips below) to change colors directly.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildBandChip('Band 1', b1.name, b1.color),
-                  _buildBandChip('Band 2', b2.name, b2.color),
+                  _buildBandChip('Band 1', b1.name, b1.color, onTap: () => _openBandColorPicker(0)),
+                  _buildBandChip('Band 2', b2.name, b2.color, onTap: () => _openBandColorPicker(1)),
                   if (_selectedBandCount == 4) ...[
-                    _buildBandChip('Band 3', b3Mult.name, b3Mult.color),
-                    _buildBandChip('Band 4', b4Tol.name, b4Tol.color),
+                    _buildBandChip('Band 3', b3Mult.name, b3Mult.color, onTap: () => _openBandColorPicker(2)),
+                    _buildBandChip('Band 4', b4Tol.name, b4Tol.color, onTap: () => _openBandColorPicker(3)),
                   ] else ...[
-                    _buildBandChip('Band 3', b3Digit.name, b3Digit.color),
-                    _buildBandChip('Band 4', b4Mult.name, b4Mult.color),
-                    _buildBandChip('Band 5', b5Tol.name, b5Tol.color),
+                    _buildBandChip('Band 3', b3Digit.name, b3Digit.color, onTap: () => _openBandColorPicker(2)),
+                    _buildBandChip('Band 4', b4Mult.name, b4Mult.color, onTap: () => _openBandColorPicker(3)),
+                    _buildBandChip('Band 5', b5Tol.name, b5Tol.color, onTap: () => _openBandColorPicker(4)),
                     if (_selectedBandCount == 6)
-                      _buildBandChip('Band 6', b6Temp.name, b6Temp.color),
+                      _buildBandChip('Band 6', b6Temp.name, b6Temp.color, onTap: () => _openBandColorPicker(5)),
                   ],
                 ],
               ),
@@ -1463,39 +1549,50 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     );
   }
 
-  Widget _buildBandChip(String label, String colorName, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.60),
+  Widget _buildBandChip(String label, String colorName, Color color, {VoidCallback? onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: color == Colors.white ? Colors.grey : Colors.white24,
-                width: 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.60),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: color == Colors.white ? Colors.grey : Colors.white24,
+                    width: 0.5,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 6),
+              Text(
+                '$label: $colorName',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFF1F5F9),
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.edit_outlined, size: 12, color: Color(0xFF00E5FF)),
+              ],
+            ],
           ),
-          const SizedBox(width: 6),
-          Text(
-            '$label: $colorName',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFF1F5F9),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

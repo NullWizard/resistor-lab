@@ -50,6 +50,7 @@ void main() {
       // Drag right: dx > 0 -> deltaRot = rotY(-dx * 0.015)
       final dragRightDelta = Matrix3.rotationY(-0.15);
       final newRot = dragRightDelta.multiply(backFacing).orthonormalized();
+      expect(newRot.m00.isFinite, isTrue);
 
       // A point currently facing the viewer in camera space (z < 0):
       // For any point in camera space, pre-multiplying dragRightDelta rotates it in camera space
