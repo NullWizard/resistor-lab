@@ -270,6 +270,7 @@ class InteractiveBandOverlay extends StatefulWidget {
   final Function(int bandIndex, int colorIndex) onBandColorChanged;
   final double viewportWidth;
   final double viewportHeight;
+  final List<double>? detectedAxisPositions;
 
   const InteractiveBandOverlay({
     super.key,
@@ -283,6 +284,7 @@ class InteractiveBandOverlay extends StatefulWidget {
     required this.onBandColorChanged,
     required this.viewportWidth,
     required this.viewportHeight,
+    this.detectedAxisPositions,
   });
 
   @override
@@ -302,18 +304,29 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
   @override
   void didUpdateWidget(covariant InteractiveBandOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.bandCount != widget.bandCount) {
+    if (oldWidget.bandCount != widget.bandCount ||
+        oldWidget.detectedAxisPositions != widget.detectedAxisPositions) {
       _initPositions();
     }
   }
 
   void _initPositions() {
+    // If detected physical positions are provided from scan, use them
+    if (widget.detectedAxisPositions != null &&
+        widget.detectedAxisPositions!.length == widget.bandCount) {
+      _bandNormalizedX = widget.detectedAxisPositions!
+          .map((x) => x.clamp(0.12, 0.88))
+          .toList();
+      return;
+    }
+
+    // Calibrated axial resistor stripe distribution (accounting for standard tolerance gap)
     if (widget.bandCount == 4) {
-      _bandNormalizedX = [0.22, 0.42, 0.62, 0.82];
+      _bandNormalizedX = [0.24, 0.40, 0.56, 0.78];
     } else if (widget.bandCount == 5) {
-      _bandNormalizedX = [0.18, 0.34, 0.50, 0.66, 0.84];
+      _bandNormalizedX = [0.22, 0.35, 0.48, 0.61, 0.78];
     } else {
-      _bandNormalizedX = [0.16, 0.30, 0.44, 0.58, 0.72, 0.86];
+      _bandNormalizedX = [0.20, 0.32, 0.44, 0.56, 0.68, 0.80];
     }
   }
 
@@ -372,7 +385,11 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     final double guideHeight = widget.viewportHeight * 0.30;
     final double guideLeft = (widget.viewportWidth - guideWidth) / 2;
     final double guideTop = (widget.viewportHeight - guideHeight) / 2;
-    final double guideBottom = guideTop + guideHeight;
+    final double resistorCenterY = guideTop + guideHeight / 2;
+
+    final double bandRectHeight = guideHeight * 0.72;
+    final double bandRectWidth =
+        (guideWidth / (widget.bandCount + 2.5)).clamp(15.0, 24.0);
 
     final List<_BandPlacement> placements = [];
     for (int i = 0; i < widget.bandCount; i++) {
@@ -380,9 +397,16 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       final bool isTop = i % 2 == 0;
       final info = _getBandInfo(i);
 
+      final Rect bandRect = Rect.fromCenter(
+        center: Offset(bandX, resistorCenterY),
+        width: bandRectWidth,
+        height: bandRectHeight,
+      );
+
       placements.add(_BandPlacement(
         bandIndex: i,
         bandX: bandX,
+        bandRect: bandRect,
         isTop: isTop,
         info: info,
         isActive: _activeBandIndex == i,
@@ -392,36 +416,25 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Layer A: Technical Lines & Pointing Arrows CustomPainter
+        // Layer A: Technical Wireframes, Lines & Pointing Arrows CustomPainter
         Positioned.fill(
           child: CustomPaint(
             painter: _BandOverlayLinesPainter(
               placements: placements,
-              guideTop: guideTop,
-              guideBottom: guideBottom,
-              guideHeight: guideHeight,
               viewportHeight: widget.viewportHeight,
             ),
           ),
         ),
 
-        // Layer B: Interactive Colored Boxes positioned along top & bottom tiers
+        // Layer B: Interactive Colored Boxes along top & bottom tiers
         for (final p in placements)
           _buildInteractiveBox(
             placement: p,
-            guideWidth: guideWidth,
           ),
 
-        // Layer C: Interactive Touch Target Pins on the resistor body
+        // Layer C: Interactive Touch Targets over the highlighted rectangle wireframes
         for (final p in placements)
-          _buildResistorTouchPin(
-            placement: p,
-            guideTop: guideTop,
-            guideBottom: guideBottom,
-            guideHeight: guideHeight,
-            guideLeft: guideLeft,
-            guideWidth: guideWidth,
-          ),
+          _buildBandWireframeTouchTarget(p),
 
         // Layer D: Top Hint Bar
         Positioned(
@@ -432,12 +445,14 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
+              border: Border.all(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.touch_app_rounded, color: Color(0xFF00E5FF), size: 13),
+                const Icon(Icons.touch_app_rounded,
+                    color: Color(0xFF00E5FF), size: 13),
                 const SizedBox(width: 4),
                 Text(
                   'TAP BOX TO EDIT',
@@ -458,18 +473,19 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
 
   Widget _buildInteractiveBox({
     required _BandPlacement placement,
-    required double guideWidth,
   }) {
-    const double boxWidth = 92.0;
+    const double boxWidth = 88.0;
     const double boxHeight = 32.0;
 
     final double boxLeft = (placement.bandX - boxWidth / 2)
-        .clamp(8.0, widget.viewportWidth - boxWidth - 8.0);
-    final double boxTop = placement.isTop ? 18.0 : widget.viewportHeight - 18.0 - boxHeight;
+        .clamp(6.0, widget.viewportWidth - boxWidth - 6.0);
+    final double boxTop =
+        placement.isTop ? 14.0 : widget.viewportHeight - 14.0 - boxHeight;
 
     final bool isBlack = placement.info.color == const Color(0xFF212121) ||
         placement.info.color.computeLuminance() < 0.05;
-    final Color borderColor = isBlack ? const Color(0xFF00E5FF) : placement.info.color;
+    final Color borderColor =
+        isBlack ? const Color(0xFF00E5FF) : placement.info.color;
 
     return Positioned(
       left: boxLeft,
@@ -479,25 +495,21 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _openColorPicker(placement.bandIndex),
-        onHorizontalDragUpdate: (details) {
-          setState(() {
-            final double deltaNorm = details.delta.dx / guideWidth;
-            _bandNormalizedX[placement.bandIndex] =
-                (_bandNormalizedX[placement.bandIndex] + deltaNorm).clamp(0.06, 0.94);
-          });
-        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             color: const Color(0xFF070C18).withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: placement.isActive ? const Color(0xFF00E5FF) : borderColor.withValues(alpha: 0.85),
+              color: placement.isActive
+                  ? const Color(0xFF00E5FF)
+                  : borderColor.withValues(alpha: 0.85),
               width: placement.isActive ? 2.0 : 1.4,
             ),
             boxShadow: [
               BoxShadow(
-                color: borderColor.withValues(alpha: placement.isActive ? 0.55 : 0.30),
+                color: borderColor.withValues(
+                    alpha: placement.isActive ? 0.55 : 0.30),
                 blurRadius: placement.isActive ? 14 : 8,
                 spreadRadius: placement.isActive ? 2 : 0,
               ),
@@ -558,35 +570,18 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     );
   }
 
-  Widget _buildResistorTouchPin({
-    required _BandPlacement placement,
-    required double guideTop,
-    required double guideBottom,
-    required double guideHeight,
-    required double guideLeft,
-    required double guideWidth,
-  }) {
-    final double targetY = placement.isTop
-        ? guideTop + guideHeight * 0.16
-        : guideBottom - guideHeight * 0.16;
-
+  Widget _buildBandWireframeTouchTarget(_BandPlacement placement) {
+    const double pad = 8.0;
     return Positioned(
-      left: placement.bandX - 22,
-      top: targetY - 22,
-      width: 44,
-      height: 44,
+      left: placement.bandRect.left - pad,
+      top: placement.bandRect.top - pad,
+      width: placement.bandRect.width + pad * 2,
+      height: placement.bandRect.height + pad * 2,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _openColorPicker(placement.bandIndex),
-        onHorizontalDragUpdate: (details) {
-          setState(() {
-            final double deltaNorm = details.delta.dx / guideWidth;
-            _bandNormalizedX[placement.bandIndex] =
-                (_bandNormalizedX[placement.bandIndex] + deltaNorm).clamp(0.06, 0.94);
-          });
-        },
         child: Container(
-          color: Colors.transparent, // expanded touch target
+          color: Colors.transparent, // Expanded touch target directly over the highlighted stripe
         ),
       ),
     );
@@ -596,6 +591,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
 class _BandPlacement {
   final int bandIndex;
   final double bandX;
+  final Rect bandRect;
   final bool isTop;
   final ResistorBandInfo info;
   final bool isActive;
@@ -603,119 +599,155 @@ class _BandPlacement {
   _BandPlacement({
     required this.bandIndex,
     required this.bandX,
+    required this.bandRect,
     required this.isTop,
     required this.info,
     required this.isActive,
   });
 }
 
-/// Custom painter for glowing connection lines and pointer arrows pointing to the resistor bands.
+/// Custom painter for rectangle wireframes and pointer arrows pointing to the resistor bands.
 class _BandOverlayLinesPainter extends CustomPainter {
   final List<_BandPlacement> placements;
-  final double guideTop;
-  final double guideBottom;
-  final double guideHeight;
   final double viewportHeight;
 
   _BandOverlayLinesPainter({
     required this.placements,
-    required this.guideTop,
-    required this.guideBottom,
-    required this.guideHeight,
     required this.viewportHeight,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     const double boxHeight = 32.0;
-    const double boxWidth = 92.0;
+    const double boxWidth = 88.0;
 
     for (final p in placements) {
-      final double boxLeft = (p.bandX - boxWidth / 2).clamp(8.0, size.width - boxWidth - 8.0);
+      final isBlack = p.info.color == const Color(0xFF212121) ||
+          p.info.color.computeLuminance() < 0.05;
+      final Color wireframeColor =
+          isBlack ? const Color(0xFF00E5FF) : p.info.color;
+
+      // -------------------------------------------------------------
+      // 1. RECTANGLE WIREFRAME HIGHLIGHTING THE RESISTOR BAND
+      // -------------------------------------------------------------
+      final rrect = RRect.fromRectAndRadius(
+        p.bandRect,
+        const Radius.circular(3.0),
+      );
+
+      // 1a. Inner Translucent Highlight Wash
+      final fillPaint = Paint()
+        ..color = wireframeColor.withValues(alpha: p.isActive ? 0.32 : 0.16)
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(rrect, fillPaint);
+
+      // 1b. Outer Glow Aura Stroke
+      final auraPaint = Paint()
+        ..color = wireframeColor.withValues(alpha: p.isActive ? 0.65 : 0.30)
+        ..strokeWidth = 4.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawRRect(rrect, auraPaint);
+
+      // 1c. Crisp Rectangle Wireframe Stroke
+      final wireframePaint = Paint()
+        ..color = wireframeColor
+        ..strokeWidth = p.isActive ? 2.4 : 1.8
+        ..style = PaintingStyle.stroke;
+      canvas.drawRRect(rrect, wireframePaint);
+
+      // 1d. Corner CAD Brackets (High-Tech Reticle Accents)
+      final cornerPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.95)
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.square
+        ..style = PaintingStyle.stroke;
+      const double cLen = 4.5;
+      // Top-Left
+      canvas.drawLine(Offset(p.bandRect.left, p.bandRect.top + cLen), Offset(p.bandRect.left, p.bandRect.top), cornerPaint);
+      canvas.drawLine(Offset(p.bandRect.left, p.bandRect.top), Offset(p.bandRect.left + cLen, p.bandRect.top), cornerPaint);
+      // Top-Right
+      canvas.drawLine(Offset(p.bandRect.right - cLen, p.bandRect.top), Offset(p.bandRect.right, p.bandRect.top), cornerPaint);
+      canvas.drawLine(Offset(p.bandRect.right, p.bandRect.top), Offset(p.bandRect.right, p.bandRect.top + cLen), cornerPaint);
+      // Bottom-Left
+      canvas.drawLine(Offset(p.bandRect.left, p.bandRect.bottom - cLen), Offset(p.bandRect.left, p.bandRect.bottom), cornerPaint);
+      canvas.drawLine(Offset(p.bandRect.left, p.bandRect.bottom), Offset(p.bandRect.left + cLen, p.bandRect.bottom), cornerPaint);
+      // Bottom-Right
+      canvas.drawLine(Offset(p.bandRect.right - cLen, p.bandRect.bottom), Offset(p.bandRect.right, p.bandRect.bottom), cornerPaint);
+      canvas.drawLine(Offset(p.bandRect.right, p.bandRect.bottom), Offset(p.bandRect.right, p.bandRect.bottom - cLen), cornerPaint);
+
+      // -------------------------------------------------------------
+      // 2. CONNECTING LINE AND DIRECTIONAL POINTER ARROW
+      // -------------------------------------------------------------
+      final double boxLeft =
+          (p.bandX - boxWidth / 2).clamp(6.0, size.width - boxWidth - 6.0);
       final double boxCenterX = boxLeft + boxWidth / 2;
 
-      final double startY = p.isTop ? 18.0 + boxHeight : viewportHeight - 18.0 - boxHeight;
-      final double targetY = p.isTop
-          ? guideTop + guideHeight * 0.16
-          : guideBottom - guideHeight * 0.16;
+      final double startY =
+          p.isTop ? 14.0 + boxHeight : viewportHeight - 14.0 - boxHeight;
+      final double arrowTipY = p.isTop ? p.bandRect.top : p.bandRect.bottom;
+      final double arrowBaseY =
+          p.isTop ? arrowTipY - 9.0 : arrowTipY + 9.0;
 
-      final isBlack = p.info.color == const Color(0xFF212121) || p.info.color.computeLuminance() < 0.05;
-      final Color drawColor = isBlack ? const Color(0xFF00E5FF) : p.info.color;
-
-      // 1. Glowing outer aura stroke
-      final auraPaint = Paint()
-        ..color = drawColor.withValues(alpha: p.isActive ? 0.45 : 0.22)
-        ..strokeWidth = 4.5
+      // Outer glow line
+      final lineAuraPaint = Paint()
+        ..color = wireframeColor.withValues(alpha: p.isActive ? 0.45 : 0.22)
+        ..strokeWidth = 3.8
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke;
 
-      // 2. Crisp inner solid line
-      final corePaint = Paint()
-        ..color = drawColor
-        ..strokeWidth = 2.0
+      // Inner crisp solid line
+      final lineCorePaint = Paint()
+        ..color = wireframeColor
+        ..strokeWidth = 1.8
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke;
 
-      // Path connecting box to band position
       final linePath = Path();
       linePath.moveTo(boxCenterX, startY);
 
-      if ((boxCenterX - p.bandX).abs() > 4) {
-        final double midY = startY + (targetY - startY) * 0.45;
+      if ((boxCenterX - p.bandX).abs() > 3.0) {
+        final double midY = startY + (arrowBaseY - startY) * 0.45;
         linePath.lineTo(boxCenterX, midY);
-        linePath.lineTo(p.bandX, midY + (p.isTop ? 10 : -10));
-        linePath.lineTo(p.bandX, targetY);
+        linePath.lineTo(p.bandX, midY + (p.isTop ? 7.0 : -7.0));
+        linePath.lineTo(p.bandX, arrowBaseY);
       } else {
-        linePath.lineTo(p.bandX, targetY);
+        linePath.lineTo(p.bandX, arrowBaseY);
       }
 
-      canvas.drawPath(linePath, auraPaint);
-      canvas.drawPath(linePath, corePaint);
+      canvas.drawPath(linePath, lineAuraPaint);
+      canvas.drawPath(linePath, lineCorePaint);
 
-      // 3. Arrow Head pointing directly to the band on the resistor
+      // -------------------------------------------------------------
+      // 3. CRISP POINTER ARROW HEAD DIRECTING TO THE RECTANGLE WIREFRAME
+      // -------------------------------------------------------------
       final arrowPath = Path();
-      const double arrowW = 6.0;
-      const double arrowH = 10.0;
+      const double arrowW = 5.5;
 
       if (p.isTop) {
-        // Pointing DOWN ▼
-        arrowPath.moveTo(p.bandX, targetY);
-        arrowPath.lineTo(p.bandX - arrowW, targetY - arrowH);
-        arrowPath.lineTo(p.bandX + arrowW, targetY - arrowH);
+        // Points directly DOWN ▼ into the top edge of the band wireframe
+        arrowPath.moveTo(p.bandX, arrowTipY);
+        arrowPath.lineTo(p.bandX - arrowW, arrowBaseY);
+        arrowPath.lineTo(p.bandX + arrowW, arrowBaseY);
         arrowPath.close();
       } else {
-        // Pointing UP ▲
-        arrowPath.moveTo(p.bandX, targetY);
-        arrowPath.lineTo(p.bandX - arrowW, targetY + arrowH);
-        arrowPath.lineTo(p.bandX + arrowW, targetY + arrowH);
+        // Points directly UP ▲ into the bottom edge of the band wireframe
+        arrowPath.moveTo(p.bandX, arrowTipY);
+        arrowPath.lineTo(p.bandX - arrowW, arrowBaseY);
+        arrowPath.lineTo(p.bandX + arrowW, arrowBaseY);
         arrowPath.close();
       }
 
       final arrowFill = Paint()
-        ..color = drawColor
+        ..color = wireframeColor
         ..style = PaintingStyle.fill;
 
       final arrowBorder = Paint()
-        ..color = Colors.white.withValues(alpha: 0.90)
+        ..color = Colors.white.withValues(alpha: 0.95)
         ..strokeWidth = 1.0
         ..style = PaintingStyle.stroke;
 
       canvas.drawPath(arrowPath, arrowFill);
       canvas.drawPath(arrowPath, arrowBorder);
-
-      // 4. Glowing target bead on the band stripe itself
-      final beadPaint = Paint()
-        ..color = drawColor
-        ..style = PaintingStyle.fill;
-
-      final beadBorder = Paint()
-        ..color = Colors.white
-        ..strokeWidth = 1.0
-        ..style = PaintingStyle.stroke;
-
-      final Offset beadCenter = Offset(p.bandX, targetY + (p.isTop ? 2.5 : -2.5));
-      canvas.drawCircle(beadCenter, 3.5, beadPaint);
-      canvas.drawCircle(beadCenter, 3.5, beadBorder);
     }
   }
 

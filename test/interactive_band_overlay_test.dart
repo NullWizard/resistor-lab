@@ -173,5 +173,49 @@ void main() {
       expect(find.text('B4 Brown'), findsOneWidget);
       expect(find.text('B5 Brown'), findsOneWidget);
     });
+
+    testWidgets('Tapping rectangle wireframe touch target opens color picker', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 360,
+                height: 290,
+                child: InteractiveBandOverlay(
+                  bandCount: 4,
+                  band1Index: 1, // Brown
+                  band2Index: 0, // Black
+                  band3Index: 2, // Red
+                  band4Index: 2, // Gold
+                  band5Index: 0,
+                  band6Index: 0,
+                  detectedAxisPositions: const [0.25, 0.45, 0.65, 0.85],
+                  onBandColorChanged: (_, __) {},
+                  viewportWidth: 360,
+                  viewportHeight: 290,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Find the wireframe touch target container for Band 1 at center (guideLeft + guideWidth * 0.25)
+      // Viewport width = 360, guideWidth = 216, guideLeft = 72
+      // Band 1 X = 72 + 216 * 0.25 = 126
+      // Viewport height = 290, guideHeight = 87, guideTop = 101.5
+      // Resistor center Y = 101.5 + 43.5 = 145
+      final overlayTopLeft = tester.getTopLeft(find.byType(InteractiveBandOverlay));
+      final wireframeCenter = overlayTopLeft + const Offset(126, 145);
+      await tester.tapAt(wireframeCenter);
+      await tester.pumpAndSettle();
+
+      // Modal should open for Band 1
+      expect(find.text('Band 1 (1st Digit)'), findsOneWidget);
+      expect(find.text('MOST PROBABLE COLORS'), findsOneWidget);
+    });
   });
 }

@@ -41,6 +41,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
   // Detected band count from scanner, and the user's post-scan override (starts same)
   int _detectedBandCount = 4;
   int _selectedBandCount = 4;
+  List<double>? _detectedBandPositions;
   int _band1 = 1; // Default Brown
   int _band2 = 7; // Default Violet
   int _band3 = 2; // Default Red
@@ -391,10 +392,21 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
         _band4 = result.band4Index;
         _band5 = result.band5Index ?? 0;
         _band6 = result.band6Index ?? 0;
+        if (result.detectedCandidates.isNotEmpty) {
+          final positions = result.detectedCandidates
+              .map((c) => c.axisPosition)
+              .where((p) => p > 0.05 && p < 0.95)
+              .toList();
+          _detectedBandPositions =
+              positions.length == _selectedBandCount ? positions : null;
+        } else {
+          _detectedBandPositions = null;
+        }
         _clampBandIndices();
       } else {
         _hasScanError = true;
         _errorMessage = result.errorMessage ?? "Resistor not detected clearly.";
+        _detectedBandPositions = null;
       }
     });
   }
@@ -405,6 +417,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
       _isAdjustingImage = false;
       _hasScanError = true;
       _errorMessage = message;
+      _detectedBandPositions = null;
     });
   }
 
@@ -412,6 +425,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
     setState(() {
       _selectedImageBytes = null;
       _capturedImageBytes = null;
+      _detectedBandPositions = null;
       _isAdjustingImage = false;
       _hasScanError = false;
       _errorMessage = null;
@@ -757,6 +771,7 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                       band4Index: _band4,
                       band5Index: _band5,
                       band6Index: _band6,
+                      detectedAxisPositions: _detectedBandPositions,
                       onBandColorChanged: _onBandColorChanged,
                       viewportWidth: _viewportWidth,
                       viewportHeight: _viewportHeight,
@@ -1238,6 +1253,9 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
                           if (newCount != null) {
                             setState(() {
                               _selectedBandCount = newCount;
+                              if (newCount != _detectedBandCount) {
+                                _detectedBandPositions = null;
+                              }
                               _clampBandIndices();
                             });
                           }
