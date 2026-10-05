@@ -268,6 +268,7 @@ class OpticalStripeDetector {
     int bandCount, {
     double? viewportWidth,
     double? viewportHeight,
+    bool isReversed = false,
   }) {
     if (imageBytes == null || imageBytes.isEmpty) return null;
     try {
@@ -360,8 +361,8 @@ class OpticalStripeDetector {
         scores[i] = (rawScores[i - 1] + rawScores[i] * 2.0 + rawScores[i + 1]) / 4.0;
       }
 
-      // Find local maxima / peak clusters with minimum distance separation
-      final double minSeparation = gWidth / (bandCount + 3.0);
+      // Physical minimum separation between bands on axial ceramic body (5.5% of guide width)
+      final double minSeparation = gWidth * 0.055;
       final List<int> peaks = [];
 
       // Sort candidate columns by score descending
@@ -369,7 +370,9 @@ class OpticalStripeDetector {
       indices.sort((a, b) => scores[b].compareTo(scores[a]));
 
       for (final idx in indices) {
-        if (scores[idx] < 10.0) break; // noise floor
+        if (scores[idx] < 12.0) break; // noise floor
+        final double norm = idx / gWidth;
+        if (norm < 0.18 || norm > 0.82) continue; // skip outer wire leads
         bool tooClose = false;
         for (final p in peaks) {
           if ((p - idx).abs() < minSeparation) {
@@ -379,13 +382,13 @@ class OpticalStripeDetector {
         }
         if (!tooClose) {
           peaks.add(idx);
-          if (peaks.length >= bandCount + 2) break;
+          if (peaks.length >= bandCount + 3) break;
         }
       }
 
+      List<int>? chosenPeaks;
       if (peaks.length >= bandCount) {
         peaks.sort();
-        // If more peaks detected than required, pick the contiguous subset with highest scores
         if (peaks.length > bandCount) {
           double bestAvgScore = -1.0;
           List<int> bestSubset = peaks.sublist(0, bandCount);
@@ -397,20 +400,92 @@ class OpticalStripeDetector {
               bestSubset = subset;
             }
           }
-          return bestSubset.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
+          chosenPeaks = bestSubset;
+        } else {
+          chosenPeaks = peaks;
         }
-        return peaks.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
       } else if (peaks.length == bandCount - 1 && peaks.isNotEmpty) {
-        // Interpolate missing tolerance or digit band based on average spacing
         peaks.sort();
         final double avgGap = (peaks.last - peaks.first) / (peaks.length - 1);
-        final int estLast = (peaks.last + avgGap * 1.3).round().clamp(0, gWidth - 1);
+        final int estLast = (peaks.last + avgGap * 1.1).round().clamp(0, gWidth - 1);
         peaks.add(estLast);
         peaks.sort();
-        return peaks.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
+        chosenPeaks = peaks;
+      }
+
+      if (chosenPeaks != null && chosenPeaks.length == bandCount) {
+        final List<int> ordered = isReversed ? chosenPeaks.reversed.toList() : chosenPeaks;
+        return ordered.map((p) => (p / gWidth).clamp(0.08, 0.92)).toList();
       }
     } catch (_) {}
     return null;
+  }
+
+  static bool detectIsReversed(
+    Uint8List? imageBytes,
+    int bandCount, {
+    double? viewportWidth,
+    double? viewportHeight,
+  }) {
+    if (imageBytes == null || imageBytes.isEmpty) return false;
+    try {
+      final decoded = img.decodeImage(imageBytes);
+      if (decoded == null || decoded.width < 50 || decoded.height < 30) return false;
+
+      final int w = decoded.width;
+      final int h = decoded.height;
+
+      int gLeft, gRight, gTop, gBottom;
+      if (viewportWidth != null && viewportHeight != null && viewportWidth > 0 && viewportHeight > 0) {
+        final double scale = math.max(viewportWidth / w, viewportHeight / h);
+        final double renderedW = w * scale;
+        final double renderedH = h * scale;
+        final double cropX = (renderedW - viewportWidth) / 2.0;
+        final double cropY = (renderedH - viewportHeight) / 2.0;
+        final double guideViewLeft = viewportWidth * 0.20;
+        final double guideViewRight = viewportWidth * 0.80;
+        final double guideViewTop = viewportHeight * 0.35;
+        final double guideViewBottom = viewportHeight * 0.65;
+        gLeft = ((guideViewLeft + cropX) / scale).clamp(0.0, w - 1.0).round();
+        gRight = ((guideViewRight + cropX) / scale).clamp(0.0, w - 1.0).round();
+        gTop = ((guideViewTop + cropY) / scale).clamp(0.0, h - 1.0).round();
+        gBottom = ((guideViewBottom + cropY) / scale).clamp(0.0, h - 1.0).round();
+      } else {
+        gLeft = (w * 0.20).round();
+        gRight = (w * 0.80).round();
+        gTop = (h * 0.35).round();
+        gBottom = (h * 0.65).round();
+      }
+
+      final int gWidth = gRight - gLeft;
+      final int gHeight = gBottom - gTop;
+      if (gWidth < 40 || gHeight < 10) return false;
+
+      final int yCenter = (gTop + gBottom) ~/ 2;
+      double leftLum = 0, rightLum = 0;
+      int leftCount = 0, rightCount = 0;
+      for (int x = gLeft + (gWidth * 0.22).round(); x <= gLeft + (gWidth * 0.32).round(); x++) {
+        for (int y = yCenter - 4; y <= yCenter + 4; y++) {
+          final p = decoded.getPixel(x.clamp(0, w - 1), y.clamp(0, h - 1));
+          leftLum += 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+          leftCount++;
+        }
+      }
+      for (int x = gLeft + (gWidth * 0.50).round(); x <= gLeft + (gWidth * 0.62).round(); x++) {
+        for (int y = yCenter - 4; y <= yCenter + 4; y++) {
+          final p = decoded.getPixel(x.clamp(0, w - 1), y.clamp(0, h - 1));
+          rightLum += 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+          rightCount++;
+        }
+      }
+      final double avgLeftLum = leftCount > 0 ? leftLum / leftCount : 0.0;
+      final double avgRightLum = rightCount > 0 ? rightLum / rightCount : 0.0;
+
+      if (avgLeftLum > avgRightLum + 15.0) {
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 }
 
@@ -471,13 +546,40 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
   }
 
   void _initPositions() {
-    // 1. First priority: Optical stripe detector on actual image bytes
+    bool isReversed = false;
+
+    // 1. Priority A: Check if detectedAxisPositions indicates right-to-left
+    if (widget.detectedAxisPositions != null && widget.detectedAxisPositions!.length >= 2) {
+      if (widget.detectedAxisPositions!.first > widget.detectedAxisPositions!.last) {
+        isReversed = true;
+      }
+    } else {
+      // 2. Priority B: Tolerance color rule (Gold/Silver is always the last band)
+      final int tolIndex = widget.bandCount == 4
+          ? widget.band4Index
+          : (widget.bandCount == 5 ? widget.band5Index : widget.band6Index);
+      final tolColor = ResistorScannerService.toleranceColors[
+          tolIndex.clamp(0, ResistorScannerService.toleranceColors.length - 1)];
+      if (tolColor.name == 'Gold' || tolColor.name == 'Silver') {
+        if (widget.capturedImageBytes != null) {
+          isReversed = OpticalStripeDetector.detectIsReversed(
+            widget.capturedImageBytes,
+            widget.bandCount,
+            viewportWidth: widget.viewportWidth,
+            viewportHeight: widget.viewportHeight,
+          );
+        }
+      }
+    }
+
+    // 3. Priority C: Optical stripe detector on actual image bytes
     if (widget.capturedImageBytes != null) {
       final opticalStripes = OpticalStripeDetector.detectStripes(
         widget.capturedImageBytes,
         widget.bandCount,
         viewportWidth: widget.viewportWidth,
         viewportHeight: widget.viewportHeight,
+        isReversed: isReversed,
       );
       if (opticalStripes != null && opticalStripes.length == widget.bandCount) {
         _bandNormalizedX = opticalStripes;
@@ -485,23 +587,39 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
       }
     }
 
-    // 2. Second priority: Detected physical candidate positions
+    // 4. Priority D: Detected physical candidate positions mapped to guide
     if (widget.detectedAxisPositions != null &&
         widget.detectedAxisPositions!.length == widget.bandCount) {
       _bandNormalizedX = widget.detectedAxisPositions!
-          .map((x) => x.clamp(0.12, 0.88))
+          .map((x) => (0.24 + x * 0.36).clamp(0.12, 0.88))
           .toList();
       return;
     }
 
-    // 3. Fallback: Calibrated physical axial resistor stripe anchors
-    if (widget.bandCount == 4) {
-      _bandNormalizedX = [0.22, 0.38, 0.54, 0.78];
-    } else if (widget.bandCount == 5) {
-      _bandNormalizedX = [0.20, 0.34, 0.48, 0.62, 0.78];
+    // 5. Fallback: Calibrated physical axial resistor stripe anchors on central ceramic body
+    if (isReversed) {
+      if (widget.bandCount == 4) {
+        _bandNormalizedX = [0.54, 0.45, 0.36, 0.26];
+      } else if (widget.bandCount == 5) {
+        _bandNormalizedX = [0.55, 0.47, 0.40, 0.33, 0.26];
+      } else {
+        _bandNormalizedX = [0.56, 0.49, 0.43, 0.37, 0.31, 0.25];
+      }
     } else {
-      _bandNormalizedX = [0.18, 0.30, 0.42, 0.54, 0.66, 0.80];
+      if (widget.bandCount == 4) {
+        _bandNormalizedX = [0.26, 0.36, 0.45, 0.54];
+      } else if (widget.bandCount == 5) {
+        _bandNormalizedX = [0.26, 0.33, 0.40, 0.47, 0.55];
+      } else {
+        _bandNormalizedX = [0.25, 0.31, 0.37, 0.43, 0.49, 0.56];
+      }
     }
+  }
+
+  void _flipOrientation() {
+    setState(() {
+      _bandNormalizedX = _bandNormalizedX.reversed.toList();
+    });
   }
 
   void _shiftAll(double delta) {
@@ -523,27 +641,42 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
   }
 
   void _autoDetect() {
+    final bool isReversed = _bandNormalizedX.first > _bandNormalizedX.last;
     final detected = OpticalStripeDetector.detectStripes(
       widget.capturedImageBytes,
       widget.bandCount,
       viewportWidth: widget.viewportWidth,
       viewportHeight: widget.viewportHeight,
+      isReversed: isReversed,
     );
     if (detected != null && detected.length == widget.bandCount) {
       setState(() {
         _bandNormalizedX = List.from(detected);
       });
+    } else {
+      _resetPositions();
     }
   }
 
   void _resetPositions() {
     setState(() {
-      if (widget.bandCount == 4) {
-        _bandNormalizedX = [0.22, 0.38, 0.54, 0.78];
-      } else if (widget.bandCount == 5) {
-        _bandNormalizedX = [0.20, 0.34, 0.48, 0.62, 0.78];
+      final bool isReversed = _bandNormalizedX.first > _bandNormalizedX.last;
+      if (isReversed) {
+        if (widget.bandCount == 4) {
+          _bandNormalizedX = [0.54, 0.45, 0.36, 0.26];
+        } else if (widget.bandCount == 5) {
+          _bandNormalizedX = [0.55, 0.47, 0.40, 0.33, 0.26];
+        } else {
+          _bandNormalizedX = [0.56, 0.49, 0.43, 0.37, 0.31, 0.25];
+        }
       } else {
-        _bandNormalizedX = [0.18, 0.30, 0.42, 0.54, 0.66, 0.80];
+        if (widget.bandCount == 4) {
+          _bandNormalizedX = [0.26, 0.36, 0.45, 0.54];
+        } else if (widget.bandCount == 5) {
+          _bandNormalizedX = [0.26, 0.33, 0.40, 0.47, 0.55];
+        } else {
+          _bandNormalizedX = [0.25, 0.31, 0.37, 0.43, 0.49, 0.56];
+        }
       }
     });
   }
@@ -608,8 +741,12 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     final double bandRectHeight = guideHeight * 0.72;
     final double bandRectWidth =
         (guideWidth / (widget.bandCount + 2.5)).clamp(15.0, 24.0);
+    const double boxWidth = 98.0;
+    const double minGap = 6.0;
+    final double minLeft = 6.0;
+    final double maxLeft = widget.viewportWidth - boxWidth - 6.0;
 
-    final List<_BandPlacement> placements = [];
+    final List<_BandPlacement> rawPlacements = [];
     for (int i = 0; i < widget.bandCount; i++) {
       final double bandX = guideLeft + guideWidth * _bandNormalizedX[i];
       final bool isTop = i % 2 == 0;
@@ -621,15 +758,68 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
         height: bandRectHeight,
       );
 
-      placements.add(_BandPlacement(
+      rawPlacements.add(_BandPlacement(
         bandIndex: i,
         bandX: bandX,
         bandRect: bandRect,
         isTop: isTop,
         info: info,
         isActive: _activeBandIndex == i,
+        boxLeft: (bandX - boxWidth / 2).clamp(minLeft, maxLeft),
       ));
     }
+
+    void resolveTierCollisions(List<_BandPlacement> tier) {
+      if (tier.length <= 1) return;
+      tier.sort((a, b) => a.bandX.compareTo(b.bandX));
+
+      final List<double> lefts = tier.map((p) => p.boxLeft).toList();
+
+      for (int i = 1; i < lefts.length; i++) {
+        if (lefts[i] < lefts[i - 1] + boxWidth + minGap) {
+          lefts[i] = lefts[i - 1] + boxWidth + minGap;
+        }
+      }
+
+      if (lefts.last > maxLeft) {
+        lefts[lefts.length - 1] = maxLeft;
+        for (int i = lefts.length - 2; i >= 0; i--) {
+          if (lefts[i] > lefts[i + 1] - boxWidth - minGap) {
+            lefts[i] = lefts[i + 1] - boxWidth - minGap;
+          }
+        }
+      }
+
+      if (lefts.first < minLeft) {
+        lefts[0] = minLeft;
+        for (int i = 1; i < lefts.length; i++) {
+          if (lefts[i] < lefts[i - 1] + boxWidth + minGap) {
+            lefts[i] = lefts[i - 1] + boxWidth + minGap;
+          }
+        }
+      }
+
+      for (int i = 0; i < tier.length; i++) {
+        final p = tier[i];
+        tier[i] = _BandPlacement(
+          bandIndex: p.bandIndex,
+          bandX: p.bandX,
+          bandRect: p.bandRect,
+          isTop: p.isTop,
+          info: p.info,
+          isActive: p.isActive,
+          boxLeft: lefts[i].clamp(minLeft, maxLeft),
+        );
+      }
+    }
+
+    final topTier = rawPlacements.where((p) => p.isTop).toList();
+    final bottomTier = rawPlacements.where((p) => !p.isTop).toList();
+    resolveTierCollisions(topTier);
+    resolveTierCollisions(bottomTier);
+
+    final List<_BandPlacement> placements = [...topTier, ...bottomTier]
+      ..sort((a, b) => a.bandIndex.compareTo(b.bandIndex));
 
     return Stack(
       fit: StackFit.expand,
@@ -644,18 +834,7 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
           ),
         ),
 
-        // Layer B: Interactive Colored Boxes along top & bottom tiers
-        for (final p in placements)
-          _buildInteractiveBox(
-            placement: p,
-            guideWidth: guideWidth,
-          ),
-
-        // Layer C: Interactive Touch Targets over the highlighted rectangle wireframes
-        for (final p in placements)
-          _buildBandWireframeTouchTarget(p, guideWidth),
-
-        // Layer D: Top Controls Bar (Alignment Mode Toggle & Status Hint)
+        // Layer B: Top Controls Bar (Alignment Mode Toggle & Status Hint)
         Positioned(
           top: 8,
           right: 10,
@@ -741,6 +920,17 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
           ),
         ),
 
+        // Layer C: Interactive Colored Boxes along top & bottom tiers
+        for (final p in placements)
+          _buildInteractiveBox(
+            placement: p,
+            guideWidth: guideWidth,
+          ),
+
+        // Layer D: Interactive Touch Targets over the highlighted rectangle wireframes
+        for (final p in placements)
+          _buildBandWireframeTouchTarget(p, guideWidth),
+
         // Layer E: Floating Fine-Tune Alignment Toolbar (Active only in Alignment Mode)
         if (_isAlignmentMode)
           Positioned(
@@ -799,6 +989,12 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
                     ),
                     const SizedBox(width: 4),
                     _buildHudBtn(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Flip',
+                      onTap: _flipOrientation,
+                    ),
+                    const SizedBox(width: 4),
+                    _buildHudBtn(
                       icon: Icons.refresh_rounded,
                       label: 'Reset',
                       onTap: _resetPositions,
@@ -849,11 +1045,10 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     required _BandPlacement placement,
     required double guideWidth,
   }) {
-    const double boxWidth = 88.0;
+    const double boxWidth = 98.0;
     const double boxHeight = 32.0;
 
-    final double boxLeft = (placement.bandX - boxWidth / 2)
-        .clamp(6.0, widget.viewportWidth - boxWidth - 6.0);
+    final double boxLeft = placement.boxLeft;
     final double boxTop =
         placement.isTop ? 14.0 : widget.viewportHeight - 14.0 - boxHeight;
 
@@ -1000,6 +1195,7 @@ class _BandPlacement {
   final bool isTop;
   final ResistorBandInfo info;
   final bool isActive;
+  final double boxLeft;
 
   _BandPlacement({
     required this.bandIndex,
@@ -1008,6 +1204,7 @@ class _BandPlacement {
     required this.isTop,
     required this.info,
     required this.isActive,
+    required this.boxLeft,
   });
 }
 
@@ -1024,7 +1221,7 @@ class _BandOverlayLinesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const double boxHeight = 32.0;
-    const double boxWidth = 88.0;
+    const double boxWidth = 98.0;
 
     for (final p in placements) {
       final isBlack = p.info.color == const Color(0xFF212121) ||
@@ -1083,8 +1280,7 @@ class _BandOverlayLinesPainter extends CustomPainter {
       // -------------------------------------------------------------
       // 2. CONNECTING LINE AND DIRECTIONAL POINTER ARROW
       // -------------------------------------------------------------
-      final double boxLeft =
-          (p.bandX - boxWidth / 2).clamp(6.0, size.width - boxWidth - 6.0);
+      final double boxLeft = p.boxLeft;
       final double boxCenterX = boxLeft + boxWidth / 2;
 
       final double startY =
