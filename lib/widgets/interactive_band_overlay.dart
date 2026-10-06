@@ -306,134 +306,191 @@ class OpticalStripeDetector {
       final int gHeight = gBottom - gTop;
       if (gWidth < 40 || gHeight < 10) return null;
 
-      // 1. Column colors via median along central cylinder axis (rejects ridge glare)
+      // 1. Column colors via 30th-percentile luminance along cylinder cross-section.
+      // Rejects horizontal specular white glare ridges and flags thin lead-wire columns.
       final int yCenter = (gTop + gBottom) ~/ 2;
-      final int yRadius = math.max(2, (gHeight * 0.18).round());
+      final int yRadius = math.max(4, (gHeight * 0.32).round());
 
       final List<List<double>> colColors = [];
+      final List<bool> colIsWire = [];
       for (int x = gLeft; x < gRight; x++) {
-        final List<double> rList = [];
-        final List<double> gList = [];
-        final List<double> bList = [];
+        final List<List<double>> samples = [];
+        int bgCount = 0;
+        int totalCount = 0;
         for (int y = yCenter - yRadius; y <= yCenter + yRadius; y++) {
           if (y < 0 || y >= h) continue;
           final p = decoded.getPixel(x, y);
-          rList.add(p.r.toDouble());
-          gList.add(p.g.toDouble());
-          bList.add(p.b.toDouble());
+          final double r = p.r.toDouble();
+          final double g = p.g.toDouble();
+          final double b = p.b.toDouble();
+          final double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          final double maxC = math.max(r, math.max(g, b));
+          final double minC = math.min(r, math.min(g, b));
+          final double chroma = maxC - minC;
+          totalCount++;
+          if (lum > 238.0 && chroma < 18.0) {
+            bgCount++;
+          } else {
+            samples.add([lum, r, g, b]);
+          }
         }
-        rList.sort();
-        gList.sort();
-        bList.sort();
-        final int mid = rList.length ~/ 2;
-        colColors.add([rList[mid], gList[mid], bList[mid]]);
+        colIsWire.add(totalCount > 0 && bgCount > totalCount * 0.45);
+        if (samples.isEmpty) {
+          colColors.add([245.0, 245.0, 245.0]);
+        } else {
+          samples.sort((a, b) => a[0].compareTo(b[0]));
+          final int idx = (samples.length * 0.30).floor().clamp(0, samples.length - 1);
+          colColors.add([samples[idx][1], samples[idx][2], samples[idx][3]]);
+        }
       }
 
       // 2. Robust Ceramic Body Color Estimation:
-      // Sort columns by luminance. The ceramic body corresponds to the 70th percentile
-      // (avoids dark bands while avoiding extreme specular white highlights).
+      // Sort non-wire columns by luminance; the ceramic body corresponds to the 70th percentile.
       final List<double> lums = [];
       for (final c in colColors) {
         lums.add(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]);
       }
-      final sortedIndicesByLum = List.generate(colColors.length, (i) => i)
-        ..sort((a, b) => lums[a].compareTo(lums[b]));
-      final int p70 = sortedIndicesByLum[(colColors.length * 0.70).round().clamp(0, colColors.length - 1)];
+      List<int> bodyIndices = [];
+      for (int i = 0; i < colColors.length; i++) {
+        if (!colIsWire[i]) bodyIndices.add(i);
+      }
+      if (bodyIndices.isEmpty) {
+        bodyIndices = List.generate(colColors.length, (i) => i);
+      }
+      bodyIndices.sort((a, b) => lums[a].compareTo(lums[b]));
+      final int p70 = bodyIndices[(bodyIndices.length * 0.70).round().clamp(0, bodyIndices.length - 1)];
       final double bodyR = colColors[p70][0];
       final double bodyG = colColors[p70][1];
       final double bodyB = colColors[p70][2];
       final double bodyLum = lums[p70];
+      final double bodySat = math.max(bodyR, math.max(bodyG, bodyB)) -
+          math.min(bodyR, math.min(bodyG, bodyB));
 
-      // 3. Contrast Signal: Distance from ceramic body in color and luminance
+      // 3. Contrast Signal: Distance from ceramic body in color, luminance, and chroma
       final List<double> rawScores = List.filled(colColors.length, 0.0);
       for (int i = 0; i < colColors.length; i++) {
+        if (colIsWire[i]) {
+          rawScores[i] = 0.0;
+          continue;
+        }
         final c = colColors[i];
+        final double sat = math.max(c[0], math.max(c[1], c[2])) -
+            math.min(c[0], math.min(c[1], c[2]));
+        final double dSat = math.max(0.0, sat - bodySat);
+        // Reject unsaturated bright ceramic highlights
+        if (lums[i] > bodyLum && dSat < 15.0) {
+          rawScores[i] = 0.0;
+          continue;
+        }
         final double dE = math.sqrt(
           math.pow(c[0] - bodyR, 2) +
           math.pow(c[1] - bodyG, 2) +
           math.pow(c[2] - bodyB, 2),
         );
         final double dLum = math.max(0.0, bodyLum - lums[i]);
-        rawScores[i] = dE * 0.75 + dLum * 0.85;
+        rawScores[i] = dE * 0.70 + dLum * 0.85 + dSat * 0.35;
       }
 
       // 4. Proportional Moving Average Filter (window scales with guide width)
       final int win = math.max(3, (gWidth * 0.012).round());
-      final List<double> smooth = List.from(rawScores);
-      for (int i = win; i < rawScores.length - win; i++) {
+      final List<double> smooth = List.filled(rawScores.length, 0.0);
+      for (int i = 0; i < rawScores.length; i++) {
+        final int k0 = math.max(0, i - win);
+        final int k1 = math.min(rawScores.length - 1, i + win);
         double sum = 0.0;
-        for (int k = i - win; k <= i + win; k++) {
+        for (int k = k0; k <= k1; k++) {
           sum += rawScores[k];
         }
-        smooth[i] = sum / (2 * win + 1);
+        smooth[i] = sum / (k1 - k0 + 1);
       }
 
-      // 5. True Local Maxima Peak Detection:
-      // A peak must be strictly greater than all neighbors within ±peakWindow
+      // 5. Local Maxima Peak Detection & FWHM Plateau Merging
       final int peakWindow = math.max(8, (gWidth * 0.035).round());
-      const double minScoreThreshold = 35.0;
+      final int edgeMargin = math.max(4, (gWidth * 0.010).round());
+      const double minScoreThreshold = 32.0;
 
-      final List<int> candidatePeaks = [];
-      for (int i = peakWindow; i < smooth.length - peakWindow; i++) {
+      final List<int> rawPeaks = [];
+      for (int i = edgeMargin; i < smooth.length - edgeMargin; i++) {
         if (smooth[i] < minScoreThreshold) continue;
         bool isMax = true;
-        for (int k = i - peakWindow; k < i; k++) {
+        final int kStart = math.max(0, i - peakWindow);
+        final int kEnd = math.min(smooth.length - 1, i + peakWindow);
+        for (int k = kStart; k < i; k++) {
           if (smooth[i] <= smooth[k]) { isMax = false; break; }
         }
         if (!isMax) continue;
-        for (int k = i + 1; k <= i + peakWindow; k++) {
+        for (int k = i + 1; k <= kEnd; k++) {
           if (smooth[i] < smooth[k]) { isMax = false; break; }
         }
         if (isMax) {
-          candidatePeaks.add(i);
+          rawPeaks.add(i);
         }
       }
 
-      // If fewer than bandCount peaks found with minScoreThreshold, lower threshold
-      if (candidatePeaks.length < bandCount) {
-        final double lowerThresh = math.max(18.0, minScoreThreshold * 0.5);
-        for (int i = peakWindow; i < smooth.length - peakWindow; i++) {
-          if (smooth[i] >= lowerThresh && smooth[i] < minScoreThreshold) {
-            bool isMax = true;
-            for (int k = i - peakWindow; k <= i + peakWindow; k++) {
-              if (k != i && smooth[i] < smooth[k]) { isMax = false; break; }
-            }
-            if (isMax && !candidatePeaks.contains(i)) {
-              candidatePeaks.add(i);
-            }
-          }
+      // 6. Full-Width at Half-Maximum (FWHM) Interval Merging & Sub-Pixel Centering
+      final List<List<int>> plateauIntervals = [];
+      final int mergeGap = (gWidth * 0.02).round();
+      for (final p in rawPeaks) {
+        final double halfMax = smooth[p] * 0.48;
+        int leftEdge = p;
+        while (leftEdge > 0 &&
+            smooth[leftEdge - 1] >= halfMax &&
+            (p - leftEdge) < peakWindow * 2) {
+          leftEdge--;
         }
-        candidatePeaks.sort();
+        int rightEdge = p;
+        while (rightEdge < smooth.length - 1 &&
+            smooth[rightEdge + 1] >= halfMax &&
+            (rightEdge - p) < peakWindow * 2) {
+          rightEdge++;
+        }
+        if (plateauIntervals.isNotEmpty &&
+            leftEdge <= plateauIntervals.last[1] + mergeGap) {
+          final prev = plateauIntervals.last;
+          final int bestP = smooth[p] > smooth[prev[2]] ? p : prev[2];
+          plateauIntervals[plateauIntervals.length - 1] = [
+            math.min(prev[0], leftEdge),
+            math.max(prev[1], rightEdge),
+            bestP,
+          ];
+        } else {
+          plateauIntervals.add([leftEdge, rightEdge, p]);
+        }
       }
 
-      // 6. Sub-Pixel Centroid Refinement
+      final List<int> candidatePeaks = [];
       final Map<int, double> refinedCentroids = {};
-      for (final p in candidatePeaks) {
-        final int rad = math.max(3, (peakWindow ~/ 2));
+      for (final interval in plateauIntervals) {
+        final int leftEdge = interval[0];
+        final int rightEdge = interval[1];
+        final int p = interval[2];
+        final double fwhmCenter = 0.5 * (leftEdge + rightEdge);
         final double baseFloor = smooth[p] * 0.35;
         double sumW = 0.0;
         double sumWX = 0.0;
-        for (int k = p - rad; k <= p + rad; k++) {
-          if (k >= 0 && k < smooth.length) {
-            final double weight = math.max(0.0, smooth[k] - baseFloor);
-            sumW += weight;
-            sumWX += k * weight;
-          }
+        for (int k = leftEdge; k <= rightEdge; k++) {
+          final double wK = math.max(0.0, smooth[k] - baseFloor);
+          sumW += wK;
+          sumWX += k * wK;
         }
-        refinedCentroids[p] = sumW > 0.001 ? (sumWX / sumW) : p.toDouble();
+        final double weightedCenter = sumW > 0.001 ? (sumWX / sumW) : p.toDouble();
+        candidatePeaks.add(p);
+        refinedCentroids[p] = 0.60 * fwhmCenter + 0.40 * weightedCenter;
       }
 
       // 7. Optimal Subset Selection via Gap-Consistency & Score Fitness
       List<int>? chosenPeaks;
       if (candidatePeaks.length == bandCount) {
-        chosenPeaks = candidatePeaks;
+        chosenPeaks = List.from(candidatePeaks);
       } else if (candidatePeaks.length > bandCount) {
         double bestFitness = -1e9;
         List<int>? bestSubset;
 
         void findSubset(List<int> current, int start) {
           if (current.length == bandCount) {
-            final List<double> normPos = current.map((p) => (refinedCentroids[p] ?? p.toDouble()) / gWidth).toList();
+            final List<double> normPos = current
+                .map((p) => (refinedCentroids[p] ?? p.toDouble()) / gWidth)
+                .toList();
             final double span = normPos.last - normPos.first;
             if (span < 0.18 || span > 0.92) return;
 
@@ -443,10 +500,11 @@ class OpticalStripeDetector {
             }
             final double minGap = gaps.reduce(math.min);
             final double maxGap = gaps.reduce(math.max);
-            if (minGap < 0.035) return; // Bands cannot collide
+            if (minGap < 0.035) return;
 
             final double gapRatio = maxGap / minGap;
-            final double avgScore = current.map((p) => smooth[p]).reduce((a, b) => a + b) / bandCount;
+            final double avgScore =
+                current.map((p) => smooth[p]).reduce((a, b) => a + b) / bandCount;
             final double fitness = avgScore - (gapRatio - 1.0) * 45.0;
 
             if (fitness > bestFitness) {
@@ -464,37 +522,75 @@ class OpticalStripeDetector {
 
         findSubset([], 0);
         chosenPeaks = bestSubset ?? candidatePeaks.sublist(0, bandCount);
-      } else if (candidatePeaks.length == bandCount - 1 && candidatePeaks.isNotEmpty) {
-        // Interpolate single missing band based on average spacing
-        final double avgGap = (candidatePeaks.last - candidatePeaks.first) / (candidatePeaks.length - 1);
-        final int est = (candidatePeaks.last + avgGap).round().clamp(10, gWidth - 10);
-        candidatePeaks.add(est);
+      } else if (candidatePeaks.length == bandCount - 1 && candidatePeaks.length >= 2) {
+        // Extrapolate single edge-clipped or low-contrast band on whichever side has higher optical score
+        final double cFirst = refinedCentroids[candidatePeaks.first] ?? candidatePeaks.first.toDouble();
+        final double cLast = refinedCentroids[candidatePeaks.last] ?? candidatePeaks.last.toDouble();
+        final double avgGap = (cLast - cFirst) / (candidatePeaks.length - 1);
+        final double leftCand = cFirst - avgGap;
+        final double rightCand = cLast + avgGap;
+
+        double candQuality(double pos) {
+          if (pos < -0.05 * gWidth || pos > 1.05 * gWidth) return -1e6;
+          final int idx = pos.round().clamp(0, gWidth - 1);
+          final int r0 = math.max(0, idx - 6);
+          final int r1 = math.min(gWidth - 1, idx + 6);
+          double sc = 0.0;
+          for (int k = r0; k <= r1; k++) {
+            sc += smooth[k];
+          }
+          sc /= (r1 - r0 + 1);
+          if (pos < 0) sc -= (-pos) * 2.0;
+          if (pos > gWidth) sc -= (pos - gWidth) * 2.0;
+          return sc;
+        }
+
+        final int est = (candQuality(leftCand) >= candQuality(rightCand) ? leftCand : rightCand)
+            .round()
+            .clamp(4, gWidth - 5);
+        chosenPeaks = List.from(candidatePeaks)..add(est);
         refinedCentroids[est] = est.toDouble();
-        candidatePeaks.sort();
-        chosenPeaks = candidatePeaks;
+        chosenPeaks.sort();
+      } else if (candidatePeaks.length == 2 && bandCount == 4) {
+        // Extreme magnification (>2.5x zoom) where only the 2 middle bands fit inside the guide box
+        final double c0 = refinedCentroids[candidatePeaks[0]] ?? candidatePeaks[0].toDouble();
+        final double c1 = refinedCentroids[candidatePeaks[1]] ?? candidatePeaks[1].toDouble();
+        if ((c1 - c0) / gWidth > 0.28) {
+          final int leftEdgeIdx = (gWidth * 0.04).round().clamp(2, gWidth - 3);
+          final int rightEdgeIdx = (gWidth * 0.96).round().clamp(2, gWidth - 3);
+          chosenPeaks = [leftEdgeIdx, candidatePeaks[0], candidatePeaks[1], rightEdgeIdx];
+          refinedCentroids[leftEdgeIdx] = leftEdgeIdx.toDouble();
+          refinedCentroids[rightEdgeIdx] = rightEdgeIdx.toDouble();
+        }
       }
 
       // 8. Orientation Check & Normalized Coordinates Mapping
       if (chosenPeaks != null && chosenPeaks.length == bandCount) {
         bool finalReversed = isReversed;
+
+        double goldScore(List<double> c) {
+          final double r = c[0], g = c[1], b = c[2];
+          if (r > 115.0 && g > 70.0 && b < 135.0 && (r - b) > 25.0 && g > b + 15.0) {
+            return (r - b) + 0.8 * (g - b);
+          }
+          return -100.0;
+        }
+
         final int leftP = chosenPeaks.first;
         final int rightP = chosenPeaks.last;
-        final leftC = colColors[leftP];
-        final rightC = colColors[rightP];
-        // Gold: amber sheen (R > 140, G > 105, B < 130, R - B > 20)
-        final bool leftIsGold = leftC[0] > 140 && leftC[1] > 105 && leftC[2] < 130 && (leftC[0] - leftC[2]) > 20;
-        final bool rightIsGold = rightC[0] > 140 && rightC[1] > 105 && rightC[2] < 130 && (rightC[0] - rightC[2]) > 20;
+        final double lGold = goldScore(colColors[leftP]);
+        final double rGold = goldScore(colColors[rightP]);
 
-        if (leftIsGold && !rightIsGold) {
+        if (lGold > 0.0 && lGold > rGold + 15.0) {
           finalReversed = true;
-        } else if (rightIsGold && !leftIsGold) {
+        } else if (rGold > 0.0 && rGold > lGold + 15.0) {
           finalReversed = false;
         }
 
         final List<int> ordered = finalReversed ? chosenPeaks.reversed.toList() : chosenPeaks;
         return ordered.map((p) {
           final double c = refinedCentroids[p] ?? p.toDouble();
-          return (c / gWidth).clamp(0.06, 0.94);
+          return (c / gWidth).clamp(0.04, 0.96);
         }).toList();
       }
 
@@ -559,51 +655,61 @@ class OpticalStripeDetector {
       if (gWidth < 40 || gHeight < 10) return false;
 
       final int yCenter = (gTop + gBottom) ~/ 2;
-      final int yRadius = math.max(2, (gHeight * 0.18).round());
+      final int yRadius = math.max(4, (gHeight * 0.32).round());
 
-      // Sample columns at left shoulder vs right shoulder
-      final int lStart = gLeft + (gWidth * 0.08).round();
-      final int lEnd = gLeft + (gWidth * 0.32).round();
-      final int rStart = gLeft + (gWidth * 0.68).round();
-      final int rEnd = gLeft + (gWidth * 0.92).round();
+      // Sample columns across left half vs right half using 30th-percentile glare rejection
+      final int lStart = gLeft + (gWidth * 0.05).round();
+      final int lEnd = gLeft + (gWidth * 0.45).round();
+      final int rStart = gLeft + (gWidth * 0.55).round();
+      final int rEnd = gLeft + (gWidth * 0.95).round();
 
       bool isGoldLike(double r, double g, double b) {
-        return r > 135 && g > 105 && b < 135 && (r - b) > 20;
+        return r > 115.0 && g > 70.0 && b < 135.0 && (r - b) > 25.0 && g > b + 15.0;
       }
 
-      int leftGoldCount = 0;
-      int rightGoldCount = 0;
-      double leftLum = 0, rightLum = 0;
-      int leftCount = 0, rightCount = 0;
+      int leftGoldCols = 0;
+      int rightGoldCols = 0;
 
       for (int x = lStart; x <= lEnd && x < w; x++) {
+        final List<List<double>> samples = [];
         for (int y = yCenter - yRadius; y <= yCenter + yRadius; y++) {
           if (y < 0 || y >= h) continue;
           final p = decoded.getPixel(x, y);
           final double r = p.r.toDouble(), g = p.g.toDouble(), b = p.b.toDouble();
-          leftLum += 0.299 * r + 0.587 * g + 0.114 * b;
-          leftCount++;
-          if (isGoldLike(r, g, b)) leftGoldCount++;
+          final double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          final double chroma = math.max(r, math.max(g, b)) - math.min(r, math.min(g, b));
+          if (!(lum > 238.0 && chroma < 18.0)) {
+            samples.add([lum, r, g, b]);
+          }
+        }
+        if (samples.isNotEmpty) {
+          samples.sort((a, b) => a[0].compareTo(b[0]));
+          final c = samples[(samples.length * 0.30).floor()];
+          if (isGoldLike(c[1], c[2], c[3])) leftGoldCols++;
         }
       }
 
       for (int x = rStart; x <= rEnd && x < w; x++) {
+        final List<List<double>> samples = [];
         for (int y = yCenter - yRadius; y <= yCenter + yRadius; y++) {
           if (y < 0 || y >= h) continue;
           final p = decoded.getPixel(x, y);
           final double r = p.r.toDouble(), g = p.g.toDouble(), b = p.b.toDouble();
-          rightLum += 0.299 * r + 0.587 * g + 0.114 * b;
-          rightCount++;
-          if (isGoldLike(r, g, b)) rightGoldCount++;
+          final double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          final double chroma = math.max(r, math.max(g, b)) - math.min(r, math.min(g, b));
+          if (!(lum > 238.0 && chroma < 18.0)) {
+            samples.add([lum, r, g, b]);
+          }
+        }
+        if (samples.isNotEmpty) {
+          samples.sort((a, b) => a[0].compareTo(b[0]));
+          final c = samples[(samples.length * 0.30).floor()];
+          if (isGoldLike(c[1], c[2], c[3])) rightGoldCols++;
         }
       }
 
-      if (leftGoldCount > rightGoldCount + 20) return true;
-      if (rightGoldCount > leftGoldCount + 20) return false;
-
-      final double avgLeftLum = leftCount > 0 ? leftLum / leftCount : 0.0;
-      final double avgRightLum = rightCount > 0 ? rightLum / rightCount : 0.0;
-      if (avgLeftLum > avgRightLum + 12.0) return true;
+      if (leftGoldCols > rightGoldCols + 3) return true;
+      if (rightGoldCols > leftGoldCols + 3) return false;
     } catch (_) {}
     return false;
   }
@@ -868,8 +974,12 @@ class _InteractiveBandOverlayState extends State<InteractiveBandOverlay> {
     final double resistorCenterY = guideTop + guideHeight / 2;
 
     final double bandRectHeight = guideHeight * 0.72;
+    final double avgBandGapNorm = _bandNormalizedX.length >= 2
+        ? ((_bandNormalizedX.first - _bandNormalizedX.last).abs() /
+            (_bandNormalizedX.length - 1))
+        : (1.0 / (widget.bandCount + 2.5));
     final double bandRectWidth =
-        (guideWidth / (widget.bandCount + 2.5)).clamp(15.0, 24.0);
+        (guideWidth * avgBandGapNorm * 0.44).clamp(15.0, 30.0);
     const double boxWidth = 104.0;
     const double minGap = 6.0;
     final double minLeft = 6.0;

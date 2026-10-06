@@ -353,20 +353,15 @@ class _ScanResistorScreenState extends State<ScanResistorScreen> {
         final double vpY = (y / outH) * viewportHeight;
         final double childY = invScaleY * vpY + invTransY;
         final double imgY = (childY - offsetY) / scaleFit;
-        final int srcYInt = imgY.round();
-        final bool validY = srcYInt >= 0 && srcYInt < srcImg.height;
+        final int srcYInt = imgY.round().clamp(0, srcImg.height - 1);
 
         for (int x = 0; x < outW; x++) {
           final double vpX = (x / outW) * viewportWidth;
           final double childX = invScaleX * vpX + invTransX;
           final double imgX = (childX - offsetX) / scaleFit;
-          final int srcXInt = imgX.round();
+          final int srcXInt = imgX.round().clamp(0, srcImg.width - 1);
 
-          if (validY && srcXInt >= 0 && srcXInt < srcImg.width) {
-            outImg.setPixel(x, y, srcImg.getPixel(srcXInt, srcYInt));
-          } else {
-            outImg.setPixelRgb(x, y, 220, 200, 170);
-          }
+          outImg.setPixel(x, y, srcImg.getPixel(srcXInt, srcYInt));
         }
       }
 
